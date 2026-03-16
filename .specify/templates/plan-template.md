@@ -40,6 +40,8 @@ Verify each gate applies to this feature and document the outcome:
 | New capabilities as `createTool` with typed input/output               | III. Tool-Driven Extensibility | ✅ / ❌ / N/A |
 | Observability adapter configured; structured logging only              | IV. Observability-First        | ✅ / ❌ / N/A |
 | No speculative abstractions; complexity justified                      | V. Simplicity & YAGNI          | ✅ / ❌ / N/A |
+| Model via env vars; no hardcoded provider; Azure AI Foundry supported  | VI. Multi-Provider / BYOK      | ✅ / ❌ / N/A |
+| Channel code in `src/channels/`; agent logic channel-agnostic          | VII. Channel Abstraction       | ✅ / ❌ / N/A |
 | Tech stack additions within allowed set (see Technology Stack section) | Technology Stack               | ✅ / ❌ / N/A |
 
 > Any ❌ MUST be justified in the Complexity Tracking table below or the plan is blocked.

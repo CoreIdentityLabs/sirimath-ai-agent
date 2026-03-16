@@ -1,24 +1,29 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: (unversioned placeholder) → 1.0.0
-Bump rationale: MINOR — initial ratification; all sections new.
+Version change: 1.0.0 → 1.1.0
+Bump rationale: MINOR — two new principles added (VI, VII);
+  technology stack materially expanded for multi-provider BYOK
+  and Telegram channel support.
 
-Modified principles: N/A (initial creation)
+Modified principles:
+  - (none renamed or redefined)
 
 Added sections:
-  - Core Principles (I–V)
-  - Technology Stack
-  - Development Workflow
-  - Governance
+  - Principle VI. Multi-Provider / BYOK
+  - Principle VII. Channel Abstraction
 
-Removed sections: N/A
+Removed sections: none
 
 Templates reviewed:
-  ✅ .specify/templates/plan-template.md  — Constitution Check section updated
-  ✅ .specify/templates/spec-template.md  — no constitution-specific placeholders; aligned
-  ✅ .specify/templates/tasks-template.md — no constitution-specific placeholders; aligned
-  ✅ .specify/templates/checklist-template.md — no constitution-specific placeholders; aligned
+  ✅ .specify/templates/plan-template.md  — Constitution Check table
+     updated with Principle VI and VII rows
+  ✅ .specify/templates/spec-template.md  — no constitution-specific
+     placeholders; aligned
+  ✅ .specify/templates/tasks-template.md — no constitution-specific
+     placeholders; aligned
+  ✅ .specify/templates/checklist-template.md — no constitution-specific
+     placeholders; aligned
 
 Deferred TODOs: none
 -->
@@ -85,23 +90,68 @@ independent tools/workflows.
 **Rationale**: AI agent codebases accumulate complexity quickly. Radical
 simplicity keeps onboarding fast and the agent surface comprehensible.
 
+### VI. Multi-Provider / BYOK
+
+The agent MUST support multiple LLM providers via the Vercel AI SDK
+provider ecosystem (Bring Your Own Key). Model selection MUST be
+configurable through environment variables (`MODEL_PROVIDER` and
+`MODEL_ID`); no source code changes are permitted to switch providers.
+Azure AI Foundry models MUST be supported as a first-class provider
+alongside OpenAI, Anthropic, Google, and others. Each provider
+package (e.g., `@ai-sdk/azure`, `@ai-sdk/openai`) is an optional
+runtime dependency — only the configured provider is loaded.
+
+**Rationale**: A personal assistant locked to a single vendor
+limits user choice and increases cost risk. BYOK ensures users
+control their own API keys, billing, and model selection while the
+agent code remains provider-agnostic.
+
+### VII. Channel Abstraction
+
+Communication channels (Telegram, HTTP API, future channels) MUST be
+decoupled from agent logic. Each channel adapter MUST translate
+external protocol messages into VoltAgent agent invocations
+(`generateText` / `streamText`). Channel-specific code MUST reside
+in a dedicated module under `src/channels/`. The agent MUST remain
+channel-agnostic — adding or removing a channel MUST NOT require
+changes to agent instructions, tools, or workflows.
+
+**Rationale**: The assistant's intelligence lives in the agent and
+its tools. Coupling agent logic to a specific messaging protocol
+(e.g., Telegram Bot API) prevents reuse across interfaces and
+makes testing harder. Clean channel separation enables adding
+new frontends (WhatsApp, Slack, voice) without touching core logic.
+
 ## Technology Stack
 
 - **Runtime**: Node.js ≥ 20 (LTS); ESM modules (`"type": "module"`)
 - **Language**: TypeScript 5.x, `strict: true`
-- **Agent Framework**: `@voltagent/core` ^2.0.0 — no custom agent runners
-- **LLM Default**: `openai/gpt-4o-mini` (configurable via environment)
-- **Server**: `@voltagent/server-hono` — Hono adapter; no additional HTTP
-  frameworks
-- **Persistence**: `@voltagent/libsql` (LibSQL/SQLite) for memory and
-  observability; no other databases without explicit justification
+- **Agent Framework**: `@voltagent/core` ^2.0.0 — no custom agent
+  runners
+- **LLM Providers**: Vercel AI SDK v6 provider packages; model
+  selected at runtime via `MODEL_PROVIDER` + `MODEL_ID` env vars;
+  fallback default: `openai/gpt-4o-mini`. Supported providers
+  include (non-exhaustive):
+  - `@ai-sdk/openai` — OpenAI / OpenAI-compatible
+  - `@ai-sdk/azure` — Azure AI Foundry (Azure OpenAI)
+  - `@ai-sdk/anthropic` — Anthropic Claude
+  - `@ai-sdk/google` — Google Gemini
+  - `@ai-sdk/groq` — Groq
+  - `@ai-sdk/mistral` — Mistral
+  - `ollama-ai-provider-v2` — Ollama (local models)
+- **Telegram**: `grammy` — Telegram Bot API framework; webhook or
+  long-polling mode configurable via environment
+- **Server**: `@voltagent/server-hono` — Hono adapter; no additional
+  HTTP frameworks
+- **Persistence**: `@voltagent/libsql` (LibSQL/SQLite) for memory
+  and observability; no other databases without explicit justification
 - **Validation**: `zod` ^3 — sole schema and validation library
-- **Linting**: Biome (`@biomejs/biome`) — ESLint and Prettier MUST NOT be
-  added
-- **Build**: `tsdown` — no Webpack, Rollup, or esbuild configurations outside
-  tsdown
-- **Container**: Dockerfile MUST remain the single production packaging
-  artefact; no docker-compose in production deployments
+- **Linting**: Biome (`@biomejs/biome`) — ESLint and Prettier MUST
+  NOT be added
+- **Build**: `tsdown` — no Webpack, Rollup, or esbuild
+  configurations outside tsdown
+- **Container**: Dockerfile MUST remain the single production
+  packaging artefact; no docker-compose in production deployments
 
 ## Development Workflow
 
@@ -116,8 +166,8 @@ Local development: `npm run dev` (tsx watch, hot reload).
 Environment variables MUST be loaded via `dotenv/config`; `.env` MUST be
 gitignored; `.env.example` MUST document every required variable.
 
-All secrets (API keys) MUST be injected via environment variables —
-never hard-coded or committed.
+All secrets (API keys, bot tokens) MUST be injected via environment
+variables — never hard-coded or committed.
 
 Pull requests MUST include a brief description of which principles were
 verified during review.
@@ -143,4 +193,4 @@ This constitution supersedes all other project practices. Amendments require:
 Constitution Check section listing which gates apply to that feature. Reviewers
 MUST reject plans that leave the Constitution Check blank or unevaluated.
 
-**Version**: 1.0.0 | **Ratified**: 2026-03-16 | **Last Amended**: 2026-03-16
+**Version**: 1.1.0 | **Ratified**: 2026-03-16 | **Last Amended**: 2026-03-16
