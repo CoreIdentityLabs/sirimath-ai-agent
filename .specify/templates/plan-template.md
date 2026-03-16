@@ -29,9 +29,20 @@
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-[Gates determined based on constitution file]
+Verify each gate applies to this feature and document the outcome:
+
+| Gate                                                                   | Principle                      | Outcome       |
+| ---------------------------------------------------------------------- | ------------------------------ | ------------- |
+| Agent-First: feature exposed via a VoltAgent agent                     | I. Agent-First Design          | ✅ / ❌ / N/A |
+| All new code in TypeScript strict; Zod schemas for tool/workflow I/O   | II. Type Safety                | ✅ / ❌ / N/A |
+| New capabilities as `createTool` with typed input/output               | III. Tool-Driven Extensibility | ✅ / ❌ / N/A |
+| Observability adapter configured; structured logging only              | IV. Observability-First        | ✅ / ❌ / N/A |
+| No speculative abstractions; complexity justified                      | V. Simplicity & YAGNI          | ✅ / ❌ / N/A |
+| Tech stack additions within allowed set (see Technology Stack section) | Technology Stack               | ✅ / ❌ / N/A |
+
+> Any ❌ MUST be justified in the Complexity Tracking table below or the plan is blocked.
 
 ## Project Structure
 
@@ -48,6 +59,7 @@ specs/[###-feature]/
 ```
 
 ### Source Code (repository root)
+
 <!--
   ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
   for this feature. Delete unused options and expand the chosen structure with
@@ -98,7 +110,7 @@ directories captured above]
 
 > **Fill ONLY if Constitution Check has violations that must be justified**
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
-| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
+| Violation                  | Why Needed         | Simpler Alternative Rejected Because |
+| -------------------------- | ------------------ | ------------------------------------ |
+| [e.g., 4th project]        | [current need]     | [why 3 projects insufficient]        |
+| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient]  |
