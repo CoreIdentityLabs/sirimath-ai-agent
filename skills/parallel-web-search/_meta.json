@@ -1,0 +1,8 @@
+{
+  "slug": "parallel-web-search",
+  "name": "parallel-web-search",
+  "description": "DEFAULT for all research and web queries. Use for any lookup, research, investigation, or question needing current info. Fast and cost-effective. Only use parallel-deep-research if user explicitly requests 'deep' or 'exhaustive' research.",
+  "source": "parallel-web/parallel-agent-skills",
+  "version": "1.0.0",
+  "installedAt": "2026-03-16T17:53:48.344Z"
+}
