@@ -1,58 +1,82 @@
 import "dotenv/config";
 import {
-  VoltAgent,
-  VoltOpsClient,
-  Agent,
-  Memory,
-  VoltAgentObservability,
+	Agent,
+	Memory,
+	VoltAgent,
+	VoltAgentObservability,
+	VoltOpsClient,
 } from "@voltagent/core";
 import {
-  LibSQLMemoryAdapter,
-  LibSQLObservabilityAdapter,
+	LibSQLMemoryAdapter,
+	LibSQLObservabilityAdapter,
 } from "@voltagent/libsql";
 import { createPinoLogger } from "@voltagent/logger";
 import { honoServer } from "@voltagent/server-hono";
+import { startTelegramBot } from "./channels/telegram";
+import { resolveModel } from "./config/model-provider";
+import { fetchUrlTool, findSkillsTool, installSkillTool, weatherTool, webSearchEnabled, webSearchTool } from "./tools";
 
 // Create a logger instance
 const logger = createPinoLogger({
-  name: "sirimath-ai-agent",
-  level: "info",
+	name: "sirimath-ai-agent",
+	level: "info",
 });
 
 // Configure persistent memory (LibSQL / SQLite)
 const memory = new Memory({
-  storage: new LibSQLMemoryAdapter({
-    url: "file:./.voltagent/memory.db",
-    logger: logger.child({ component: "libsql" }),
-  }),
+	storage: new LibSQLMemoryAdapter({
+		url: "file:./.voltagent/memory.db",
+		logger: logger.child({ component: "libsql" }),
+	}),
 });
 
 // Configure persistent observability (LibSQL / SQLite)
 const observability = new VoltAgentObservability({
-  storage: new LibSQLObservabilityAdapter({
-    url: "file:./.voltagent/observability.db",
-  }),
+	storage: new LibSQLObservabilityAdapter({
+		url: "file:./.voltagent/observability.db",
+	}),
 });
 
+const model = await resolveModel();
+
 const agent = new Agent({
-  name: "sirimath-ai-agent",
-  instructions:
-    "A helpful assistant that can chat, speak, and help with various tasks",
-  model: "openai/gpt-4o-mini",
-  tools: [],
-  memory,
+	name: "sirimath-ai-agent",
+	instructions: `You are a helpful personal assistant accessible via Telegram.
+
+You can:
+- Chat and answer questions on any topic
+- Fetch real-time data from the internet using fetchUrl (REST APIs, JSON endpoints, plain-text pages)
+- Get current real weather for any city using getWeather (powered by open-meteo.com, no API key needed)${webSearchEnabled ? "\n- Search the web for up-to-date information using webSearch" : ""}
+- Discover and install agent skills from the skills.sh ecosystem
+
+When a user asks for current weather or weather in a city, use the getWeather tool.
+When a user asks to fetch a URL or call an API, use the fetchUrl tool.${webSearchEnabled ? "\nWhen a user asks to search the web, look up news, or needs current information, use the webSearch tool." : ""}
+When a user asks to find, discover, or search for skills, or says "how do I do X" where X might be an existing skill, use the findSkills tool and present the results with the security table shown.
+When the user picks a skill number from the results, confirm any security warnings and then use the installSkill tool to install it.
+When presenting skill search results, always show the full formatted table including security scores.`,
+	model,
+	tools: [
+		weatherTool,
+		fetchUrlTool,
+		...(webSearchEnabled ? [webSearchTool] : []),
+		findSkillsTool,
+		installSkillTool,
+	],
+	memory,
 });
 
 new VoltAgent({
-  agents: {
-    agent,
-  },
-  workflows: {},
-  server: honoServer(),
-  logger,
-  observability,
-  voltOpsClient: new VoltOpsClient({
-    publicKey: process.env.VOLTAGENT_PUBLIC_KEY || "",
-    secretKey: process.env.VOLTAGENT_SECRET_KEY || "",
-  }),
+	agents: {
+		agent,
+	},
+	workflows: {},
+	server: honoServer(),
+	logger,
+	observability,
+	voltOpsClient: new VoltOpsClient({
+		publicKey: process.env.VOLTAGENT_PUBLIC_KEY || "",
+		secretKey: process.env.VOLTAGENT_SECRET_KEY || "",
+	}),
 });
+
+startTelegramBot(agent, logger);
