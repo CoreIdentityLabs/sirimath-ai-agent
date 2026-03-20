@@ -1,6 +1,7 @@
-import type { Agent } from "@voltagent/core";
+import type { Agent, Voice } from "@voltagent/core";
 import type { Logger } from "@voltagent/logger";
-import { Bot } from "grammy";
+import { Bot, Context, InputFile } from "grammy";
+import { Readable } from "node:stream";
 
 function splitMessage(text: string, maxLen: number): string[] {
 	if (text.length <= maxLen) return [text];
@@ -56,6 +57,7 @@ function splitMessage(text: string, maxLen: number): string[] {
 export async function startTelegramBot(
 	agent: Agent,
 	logger: Logger,
+	voiceProvider?: Voice | null,
 ): Promise<void> {
 	const token = process.env.TELEGRAM_BOT_TOKEN;
 	if (!token) {
@@ -79,6 +81,110 @@ export async function startTelegramBot(
 		: new Set();
 
 	const bot = new Bot(token);
+
+	// Shared voice processing pipeline: download → STT → agent → TTS reply + text
+	async function processVoiceMessage(
+		ctx: Context,
+		fileId: string,
+	): Promise<void> {
+		const userId = ctx.from?.id?.toString() ?? "unknown";
+		const conversationId = ctx.chat?.id.toString() ?? "unknown";
+
+		// Access control
+		if (allowedIds.size > 0 && !allowedIds.has(userId)) {
+			logger.warn("[telegram] Unauthorized voice access attempt", { userId });
+			await ctx.reply("Sorry, you don't have access to this assistant.");
+			return;
+		}
+
+		logger.info("[telegram] Received voice message", { userId, conversationId, fileId });
+
+		// Download voice file from Telegram
+		let audioBuffer: Buffer;
+		try {
+			const file = await ctx.api.getFile(fileId);
+			const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+			const response = await fetch(fileUrl);
+			if (!response.ok) {
+				throw new Error(`HTTP ${response.status} downloading voice file`);
+			}
+			audioBuffer = Buffer.from(await response.arrayBuffer());
+		} catch (err) {
+			logger.error("[telegram] Failed to download voice file", { err, userId, fileId });
+			await ctx.reply("Sorry, I couldn't download your voice message. Please try again.");
+			return;
+		}
+
+		// STT: Buffer → ReadableStream → transcribed text
+		let transcript: string;
+		try {
+			const audioStream = Readable.from(audioBuffer);
+			const sttResult = await voiceProvider!.listen(audioStream);
+			transcript = typeof sttResult === "string" ? sttResult : "";
+		} catch (err) {
+			logger.error("[telegram] STT transcription failed", { err, userId });
+			await ctx.reply("Sorry, I couldn't transcribe your voice message. Please try again or send a text message.");
+			return;
+		}
+
+		if (!transcript.trim()) {
+			logger.warn("[telegram] Empty transcript from voice message", { userId });
+			await ctx.reply("I couldn't make out what you said. Please try again with a clearer recording.");
+			return;
+		}
+
+		logger.info("[telegram] Voice transcribed", { userId, transcriptLen: transcript.length });
+
+		// Process through agent
+		let responseText: string;
+		try {
+			const result = await agent.generateText(transcript, { userId, conversationId });
+			responseText =
+				typeof result === "string"
+					? result
+					: ((result as { text?: string }).text ?? String(result));
+		} catch (err) {
+			logger.error("[telegram] Agent error processing voice transcript", { err, userId });
+			await ctx.reply("Something went wrong while processing your message. Please try again.");
+			return;
+		}
+
+		// TTS: generate voice reply and send alongside text follow-up
+		let ttsSucceeded = false;
+		try {
+			const ttsStream = await voiceProvider!.speak(responseText);
+			const chunks: Buffer[] = [];
+			for await (const chunk of ttsStream) {
+				chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+			}
+			const ttsBuffer = Buffer.concat(chunks);
+			await ctx.replyWithVoice(new InputFile(ttsBuffer, "reply.ogg"));
+			ttsSucceeded = true;
+		} catch (err) {
+			logger.warn("[telegram] TTS failed, falling back to text-only reply", { err, userId });
+		}
+
+		// Always send text follow-up (FR-006: text accompanies voice reply; also fallback when TTS fails)
+		const textChunks = splitMessage(responseText, 4096);
+		for (const chunk of textChunks) {
+			await ctx.reply(chunk);
+		}
+
+		if (!ttsSucceeded) {
+			logger.info("[telegram] Delivered text-only reply (TTS unavailable)", { userId });
+		}
+	}
+
+	// Register voice handlers BEFORE text handler and fallback (grammy routing order matters)
+	if (voiceProvider) {
+		bot.on("message:voice", async (ctx) => {
+			await processVoiceMessage(ctx, ctx.message.voice.file_id);
+		});
+
+		bot.on("message:audio", async (ctx) => {
+			await processVoiceMessage(ctx, ctx.message.audio.file_id);
+		});
+	}
 
 	// Handle text messages
 	bot.on("message:text", async (ctx) => {
@@ -129,7 +235,9 @@ export async function startTelegramBot(
 	// Fallback: non-text messages
 	bot.on("message", async (ctx) => {
 		await ctx.reply(
-			"I currently support text messages only. Please send me a text message.",
+			voiceProvider
+				? "I support text messages and voice notes. Please send me a text or voice message."
+				: "I currently support text messages only. Please send me a text message.",
 		);
 	});
 

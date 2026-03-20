@@ -14,6 +14,7 @@ import { createPinoLogger } from "@voltagent/logger";
 import { honoServer } from "@voltagent/server-hono";
 import { startTelegramBot } from "./channels/telegram";
 import { resolveModel } from "./config/model-provider";
+import { resolveVoiceProvider } from "./config/voice-provider";
 import { fetchUrlTool, findSkillsTool, installSkillTool, weatherTool, webSearchEnabled, webSearchTool } from "./tools";
 
 // Create a logger instance
@@ -38,6 +39,7 @@ const observability = new VoltAgentObservability({
 });
 
 const model = await resolveModel();
+const voiceProvider = await resolveVoiceProvider(logger);
 
 const agent = new Agent({
 	name: "sirimath-ai-agent",
@@ -79,4 +81,4 @@ new VoltAgent({
 	}),
 });
 
-startTelegramBot(agent, logger);
+startTelegramBot(agent, logger, voiceProvider);
