@@ -357,7 +357,6 @@ MIT — see [LICENSE](LICENSE) for details.
   <p>Built with ❤️ using <a href="https://voltagent.dev">VoltAgent</a></p>
 </div>
 
-
 ---
 
 ## What is this?
@@ -641,8 +640,3 @@ Create a file under `src/channels/` (e.g. `slack.ts`, `whatsapp.ts`) that accept
 MIT — see [LICENSE](LICENSE) for details.
 
 ---
-
-<div align="center">
-  <p>Built with ❤️ using <a href="https://voltagent.dev">VoltAgent</a></p>
-</div>
-
