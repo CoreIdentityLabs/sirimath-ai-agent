@@ -33,7 +33,7 @@ export class AzureVoiceProvider extends BaseVoiceProvider {
 		this.client = new AzureOpenAI({
 			apiKey: options.apiKey,
 			endpoint: `https://${options.resourceName}.openai.azure.com/`,
-			apiVersion: "2024-06-01",
+			apiVersion: "2025-03-01-preview",
 		});
 		this.speechModel = options.speechModel ?? "whisper-1";
 		this.ttsModel = options.ttsModel ?? "tts-1";
