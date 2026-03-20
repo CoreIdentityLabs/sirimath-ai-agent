@@ -60,19 +60,32 @@ export async function resolveVoiceProvider(
 				);
 				return null;
 			}
+			// Azure requires explicit deployment names — model names like "whisper-1" are NOT valid
+			const sttModel = process.env.STT_MODEL;
+			const ttsModel = process.env.TTS_MODEL;
+			if (!sttModel) {
+				logger.error(
+					"[voice-provider] VOICE_PROVIDER=azure requires STT_MODEL to be set to your Azure Whisper deployment name (e.g. STT_MODEL=my-whisper-deployment). Voice disabled.",
+				);
+				return null;
+			}
+			if (!ttsModel) {
+				logger.error(
+					"[voice-provider] VOICE_PROVIDER=azure requires TTS_MODEL to be set to your Azure TTS deployment name (e.g. TTS_MODEL=my-tts-deployment). Voice disabled.",
+				);
+				return null;
+			}
 			const { AzureVoiceProvider } = await import(
 				"../voice/azure-voice-provider"
 			);
+			const ttsVoice = process.env.TTS_VOICE || "alloy";
 			const provider = new AzureVoiceProvider({
 				apiKey,
 				resourceName,
-				speechModel: process.env.STT_MODEL || "whisper-1",
-				ttsModel: process.env.TTS_MODEL || "tts-1",
-				voice: (process.env.TTS_VOICE || "alloy") as any, // OpenAIVoice is a string union; env var is untyped
+				speechModel: sttModel,
+				ttsModel,
+				voice: ttsVoice as any, // OpenAIVoice is a string union; env var is untyped
 			});
-			const sttModel = process.env.STT_MODEL || "whisper-1";
-			const ttsModel = process.env.TTS_MODEL || "tts-1";
-			const ttsVoice = process.env.TTS_VOICE || "alloy";
 			logger.info(
 				`[voice-provider] Voice provider initialized: azure | STT: ${sttModel} | TTS: ${ttsModel} | voice: ${ttsVoice}`,
 			);
