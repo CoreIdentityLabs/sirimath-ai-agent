@@ -2,7 +2,7 @@
 
 **Feature Branch**: `003-telegram-voice-stt-tts`  
 **Created**: 2026-03-20  
-**Status**: Draft  
+**Status**: Implemented  
 **Input**: User description: "Extend Telegram communication to support voice messages — STT for incoming voice recordings and TTS for outgoing replies"
 
 ## User Scenarios & Testing _(mandatory)_
@@ -119,3 +119,75 @@ The operator (developer) wants to choose which STT and TTS provider to use, or d
 - Azure OpenAI Service hosts the same Whisper and TTS-1 models as OpenAI, accessible via the `openai` npm package's `AzureOpenAI` class. The API surface (`.audio.transcriptions.create()` and `.audio.speech.create()`) is identical.
 - Voice message processing adds acceptable latency (under 10 seconds for STT + TTS combined) for messages of typical conversational length (under 60 seconds).
 - The TTS voice and model selection (e.g., OpenAI voice "alloy", model "tts-1") will use sensible defaults that can optionally be overridden via environment variables (`TTS_VOICE`, `TTS_MODEL`, `STT_MODEL`). For Azure, the model names correspond to Azure deployment names.
+
+---
+
+## Implementation Learnings
+
+> **Purpose**: Captures surprises, corrections, and decisions made during the actual implementation of this feature. Recorded here so future iterations, similar features, or new contributors can avoid repeating the same investigation.
+
+### L1 — Azure requires explicit deployment names; no safe defaults exist
+
+**Assumption that was wrong**: The spec and research assumed `whisper-1` would be a valid default for `STT_MODEL` on Azure, mirroring OpenAI's model name.
+
+**Reality**: Azure OpenAI does not expose models directly — you must create named *deployments* in Azure AI Foundry and reference them by the deployment name you chose (e.g. `my-whisper-deployment`). Defaulting to `"whisper-1"` causes a `404 DeploymentNotFound` error at runtime.
+
+**Fix applied**: When `VOICE_PROVIDER=azure`, both `STT_MODEL` and `TTS_MODEL` are now **required** env vars. The app logs a clear error at startup and falls back to text-only if either is missing. No silent runtime failure.
+
+**Impact on future features**: Any Azure integration that references a model by name must ask the operator for the deployment name explicitly — never assume OpenAI model names transfer over.
+
+---
+
+### L2 — Azure TTS for newer models requires API version `2025-03-01-preview`
+
+**Assumption that was wrong**: Research and initial implementation used Azure API version `2024-06-01` (the GA version with audio support).
+
+**Reality**: Newer TTS models such as `gpt-4o-mini-tts` require `api-version=2025-03-01-preview`. Using `2024-06-01` returns `404 Resource not found` for the speech endpoint. The STT (Whisper) endpoint works with `2025-03-01-preview` too — it is backward-compatible.
+
+**Fix applied**: `AzureVoiceProvider` now uses a single `AzureOpenAI` client pinned to `apiVersion: "2025-03-01-preview"`.
+
+**Note for future**: Azure API versions for audio are a moving target. When a new TTS or STT model is released, check whether a newer preview API version is required. The working API version can always be confirmed by running the request via Postman/curl with the Azure portal's generated code snippet.
+
+---
+
+### L3 — The `@voltagent/logger` `Logger` type only accepts a single string argument
+
+**Assumption that was wrong**: Generated code used Pino's native `logger.warn({ obj }, "message")` pattern (object merge + message string).
+
+**Reality**: The `Logger` interface exported from `@voltagent/logger` types `warn()`, `info()`, `error()` as `(msg: string) => void` — the standard Pino two-argument signature `(mergeObject, msg)` is not exposed in the type. TypeScript rejects any call with two arguments.
+
+**Fix applied**: All log calls in `src/config/voice-provider.ts` use template literals to embed context inline: `logger.warn(\`[voice-provider] Unsupported provider: '${name}'\`)`.
+
+**Impact on future features**: When adding structured logging context, use the existing pattern from `src/channels/telegram.ts`: `logger.warn("[tag] message", { key: value })` — this signature (string + object) appears to be what the underlying Pino instance supports at runtime, but only the `(msg: string)` overload is typed. Prefer embedding context in the message string to stay type-safe.
+
+---
+
+### L4 — grammy's `FilteredContext` type cannot be used for shared voice handler helpers
+
+**What happened**: The initial implementation typed the `processVoiceMessage` helper's `ctx` parameter using the exact filter type inferred from `bot.on<"message:voice">`. When the `message:audio` handler then called `processVoiceMessage(ctx, ...)` with an audio context, TypeScript rejected it because `FilteredContext<"message:voice">` and `FilteredContext<"message:audio">` are incompatible (audio context doesn't guarantee `.voice` is present).
+
+**Fix applied**: The shared helper uses grammy's base `Context` type instead. File IDs are passed as an explicit `fileId: string` argument rather than accessed inside the helper via `ctx.message.voice.file_id`. This pattern cleanly separates "what type of message triggered this" (caller's concern) from "what do I need to process it" (helper's concern).
+
+---
+
+### L5 — `ctx.chat` is `undefined` in grammy's base `Context` type
+
+**What happened**: Switching to `Context` (from the specific filtered context) exposed that `ctx.chat` is typed as `Chat | undefined` — the compiler raised `TS18048: 'ctx.chat' is possibly 'undefined'`.
+
+**Fix applied**: Use optional chaining with a fallback: `ctx.chat?.id.toString() ?? "unknown"`.
+
+---
+
+### L6 — `@voltagent/voice` npm install requires `--legacy-peer-deps`
+
+**What happened**: `npm install @voltagent/voice` failed due to a peer dependency conflict between the `zod@^4.0.16` requirement of `ollama-ai-provider-v2@1.5.5` and the `zod@^3.x` version already installed in the project.
+
+**Fix applied**: `npm install @voltagent/voice --legacy-peer-deps`. The conflict is between transitive dependencies in the VoltAgent ecosystem itself; the packages function correctly at runtime despite the version mismatch.
+
+**Note for future**: Track whether `ollama-ai-provider-v2` is updated to support `zod@^4.x` — once it is, the `--legacy-peer-deps` workaround can be dropped.
+
+---
+
+### L7 — `@voltagent/voice` exports at runtime (v2.x)
+
+For reference, the package exports: `BaseVoiceProvider`, `OpenAIVoiceProvider`, `ElevenLabsVoiceProvider`, `XSAIVoiceProvider`. There is no `AzureVoiceProvider` in the package — the Azure provider is a custom class in this codebase (`src/voice/azure-voice-provider.ts`) that extends `BaseVoiceProvider` directly.
