@@ -12,7 +12,7 @@
 
 ## What is this?
 
-A Telegram bot that acts as your personal AI assistant. You bring your own LLM key (OpenAI, Anthropic, Google, Azure AI Foundry, Groq, Mistral, or local Ollama) — no vendor lock-in. The assistant can search the web, fetch live data, look up real-time weather, process voice messages (speech-to-text), reply with synthesised voice (text-to-speech), and discover + install new capabilities on demand from [skills.sh](https://skills.sh).
+A Telegram bot that acts as your personal AI assistant. You bring your own LLM key (OpenAI, Anthropic, Google, Azure AI Foundry, Groq, Mistral, local Ollama, or local LM Studio) — no vendor lock-in. The assistant can search the web, fetch live data, look up real-time weather, process voice messages (speech-to-text), reply with synthesised voice (text-to-speech), and discover + install new capabilities on demand from [skills.sh](https://skills.sh).
 
 ---
 
@@ -23,7 +23,7 @@ A Telegram bot that acts as your personal AI assistant. You bring your own LLM k
 | 💬 Telegram chat       | Full multi-turn conversations with persistent memory                       |
 | 🎙️ Voice messages      | Send voice notes — transcribed via STT, replied to with voice + text       |
 | 🔊 Voice replies (TTS) | Bot replies with a synthesised voice note alongside every text follow-up   |
-| 🔑 BYOK multi-provider | 7 LLM providers switchable via env vars, zero code changes                 |
+| 🔑 BYOK multi-provider | 8 LLM providers switchable via env vars, zero code changes                 |
 | 🌐 Web access          | `fetchUrl` (HTTP GET any endpoint), optional `webSearch` (Brave or Tavily) |
 | 🌤️ Real weather        | Live weather via open-meteo.com — no API key needed                        |
 | 🔍 Skill discovery     | Search skills.sh and install new capabilities on demand                    |
@@ -83,6 +83,7 @@ TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
 | Groq             | `groq`           | `GROQ_API_KEY`                         | `llama-3.3-70b-versatile`  |
 | Mistral          | `mistral`        | `MISTRAL_API_KEY`                      | `mistral-large-latest`     |
 | Ollama (local)   | `ollama`         | _(none)_                               | `llama3.2`                 |
+| LM Studio (local)| `lmstudio`       | _(none)_                               | `llama-3.2-1b`             |
 
 Default when nothing is set: `openai` / `gpt-4o-mini`.
 
@@ -93,6 +94,8 @@ OPENAI_API_KEY=sk-...
 ```
 
 > **Azure note**: For Azure AI Foundry, `MODEL_ID` is your **deployment name** (not the model family name). The agent uses the Chat Completions API explicitly to ensure compatibility with reasoning models (`o1`, `o3`, `gpt-5.x`) in multi-turn conversations.
+
+> **LM Studio note**: No API key required. LM Studio must be running with its local server started (LM Studio → Local Server tab → Start Server). Override the default `http://localhost:1234/v1` endpoint via `LMSTUDIO_BASE_URL`.
 
 ### Telegram Options
 
@@ -361,7 +364,7 @@ MIT — see [LICENSE](LICENSE) for details.
 
 ## What is this?
 
-A Telegram bot that acts as your personal AI assistant. You bring your own LLM key (OpenAI, Anthropic, Google, Azure AI Foundry, Groq, Mistral, or local Ollama) — no vendor lock-in. The assistant can search the web, fetch live data, look up real-time weather, and discover + install new capabilities on demand from [skills.sh](https://skills.sh).
+A Telegram bot that acts as your personal AI assistant. You bring your own LLM key (OpenAI, Anthropic, Google, Azure AI Foundry, Groq, Mistral, local Ollama, or local LM Studio) — no vendor lock-in. The assistant can search the web, fetch live data, look up real-time weather, and discover + install new capabilities on demand from [skills.sh](https://skills.sh).
 
 ---
 
@@ -370,7 +373,7 @@ A Telegram bot that acts as your personal AI assistant. You bring your own LLM k
 | Capability             | Detail                                                                     |
 | ---------------------- | -------------------------------------------------------------------------- |
 | 💬 Telegram chat       | Full multi-turn conversations with persistent memory                       |
-| 🔑 BYOK multi-provider | 7 LLM providers switchable via env vars, zero code changes                 |
+| 🔑 BYOK multi-provider | 8 LLM providers switchable via env vars, zero code changes                 |
 | 🌐 Web access          | `fetchUrl` (HTTP GET any endpoint), optional `webSearch` (Brave or Tavily) |
 | 🌤️ Real weather        | Live weather via open-meteo.com — no API key needed                        |
 | 🔍 Skill discovery     | Search skills.sh and install new capabilities on demand                    |
@@ -430,6 +433,7 @@ TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
 | Groq             | `groq`           | `GROQ_API_KEY`                         | `llama-3.3-70b-versatile`  |
 | Mistral          | `mistral`        | `MISTRAL_API_KEY`                      | `mistral-large-latest`     |
 | Ollama (local)   | `ollama`         | _(none)_                               | `llama3.2`                 |
+| LM Studio (local)| `lmstudio`       | _(none)_                               | `llama-3.2-1b`             |
 
 Default when nothing is set: `openai` / `gpt-4o-mini`.
 
@@ -440,6 +444,8 @@ OPENAI_API_KEY=sk-...
 ```
 
 > **Azure note**: For Azure AI Foundry, `MODEL_ID` is your **deployment name** (not the model family name). The agent uses the Chat Completions API explicitly to ensure compatibility with reasoning models (`o1`, `o3`, `gpt-5.x`) in multi-turn conversations.
+
+> **LM Studio note**: No API key required. LM Studio must be running with its local server started (LM Studio → Local Server tab → Start Server). Override the default `http://localhost:1234/v1` endpoint via `LMSTUDIO_BASE_URL`.
 
 ### Telegram Options
 
