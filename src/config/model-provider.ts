@@ -8,6 +8,7 @@ export const SUPPORTED_PROVIDERS = [
 	"groq",
 	"mistral",
 	"ollama",
+	"lmstudio",
 ] as const;
 
 export type ProviderName = (typeof SUPPORTED_PROVIDERS)[number];
@@ -83,6 +84,16 @@ export async function resolveModel(): Promise<LanguageModel> {
 		case "ollama": {
 			const { ollama } = await import("ollama-ai-provider-v2");
 			return ollama(modelId);
+		}
+
+		case "lmstudio": {
+			const { createOpenAICompatible } = await import(
+				"@ai-sdk/openai-compatible"
+			);
+			const baseURL =
+				process.env.LMSTUDIO_BASE_URL ?? "http://localhost:1234/v1";
+			const lmstudio = createOpenAICompatible({ name: "lmstudio", baseURL });
+			return lmstudio(modelId);
 		}
 	}
 }
