@@ -341,6 +341,52 @@ Installed skills are saved as SKILL.md files under `./skills/` and persist acros
 
 ---
 
+## Heartbeat & Proactive Reminders
+
+Sirimath proactively reaches out when follow-up items are due.
+
+**How it works:**
+
+1. Tell Sirimath about a task: _"Follow up on the client proposal"_
+2. Sirimath asks: _"When should I remind you? (e.g. every 6 hours, daily at 9 AM, in 3 days)"_
+3. Reply with a cadence. Sirimath schedules it and confirms the next fire time.
+4. At the scheduled time, Sirimath sends a proactive message — no prompting needed.
+5. Reply "snooze 2 hours", "done", or "dismiss" inline to manage the reminder.
+
+**Supported reminder types:**
+
+| Type      | Example phrase  | Behaviour                              |
+| --------- | --------------- | -------------------------------------- |
+| Recurring | "every 6 hours" | Fires repeatedly at the given interval |
+| Daily     | "daily at 9 AM" | Fires every day at the configured time |
+| One-shot  | "in 3 days"     | Fires once, then marks complete        |
+
+**Channel-agnostic:** Reminders are delivered to whichever channel you're on.
+Telegram is the initial implementation. New channels implement `ChannelAdapter`
+without touching reminder logic.
+
+**Storage:** Reminder data is stored in `.voltagent/reminders.db` (SQLite), separate from
+the AI memory subsystem's `memory.db`. This allows independent backup, restore, and wiping
+of reminder state without affecting conversation history.
+
+**Configuration (`.env`):**
+
+| Variable                | Default     | Description                                       |
+| ----------------------- | ----------- | ------------------------------------------------- |
+| `HEARTBEAT_CRON`        | `* * * * *` | node-cron expression for heartbeat scan frequency |
+| `HEARTBEAT_QUIET_START` | (none)      | Global quiet hours start HH:mm                    |
+| `HEARTBEAT_QUIET_END`   | (none)      | Global quiet hours end HH:mm                      |
+
+Examples for `HEARTBEAT_CRON`:
+
+- `* * * * *` — every minute (default)
+- `*/5 * * * *` — every 5 minutes
+- `*/30 * * * * *` — every 30 seconds (seconds field, node-cron supports 6-field)
+
+Per-user quiet hours and daily digest are also configurable via chat.
+
+---
+
 ## Running Scripts
 
 ```bash

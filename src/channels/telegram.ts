@@ -3,6 +3,8 @@ import type { Voice } from "@voltagent/core";
 import type { Logger } from "@voltagent/logger";
 import { Bot, type Context, InputFile } from "grammy";
 import type { MemoryAwareAgentLike } from "../memory/index.js";
+import type { ChannelRegistry } from "../reminders/ports/channel-adapter.js";
+import { TelegramChannelAdapter } from "./telegram-channel-adapter.js";
 
 function splitMessage(text: string, maxLen: number): string[] {
 	if (text.length <= maxLen) return [text];
@@ -58,6 +60,7 @@ function splitMessage(text: string, maxLen: number): string[] {
 export async function startTelegramBot(
 	agent: MemoryAwareAgentLike,
 	logger: Logger,
+	channelRegistry: ChannelRegistry,
 	voiceProvider?: Voice | null,
 ): Promise<void> {
 	const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -82,6 +85,7 @@ export async function startTelegramBot(
 		: new Set();
 
 	const bot = new Bot(token);
+	channelRegistry.register(new TelegramChannelAdapter(bot));
 
 	// Shared voice processing pipeline: download → STT → agent → TTS reply + text
 	async function processVoiceMessage(

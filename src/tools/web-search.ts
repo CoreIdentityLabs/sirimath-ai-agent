@@ -20,7 +20,7 @@ async function braveSearch(query: string, count: number): Promise<string> {
 		headers: {
 			Accept: "application/json",
 			"Accept-Encoding": "gzip",
-			"X-Subscription-Token": process.env.BRAVE_SEARCH_API_KEY!,
+			"X-Subscription-Token": process.env.BRAVE_SEARCH_API_KEY ?? "",
 		},
 		signal: AbortSignal.timeout(15_000),
 	});
@@ -28,7 +28,10 @@ async function braveSearch(query: string, count: number): Promise<string> {
 	const data = (await res.json()) as { web?: { results?: BraveWebResult[] } };
 	const results = data.web?.results ?? [];
 	return results
-		.map((r, i) => `${i + 1}. **${r.title}**\n   ${r.url}\n   ${r.description ?? ""}`)
+		.map(
+			(r, i) =>
+				`${i + 1}. **${r.title}**\n   ${r.url}\n   ${r.description ?? ""}`,
+		)
 		.join("\n\n");
 }
 
@@ -45,11 +48,16 @@ async function tavilySearch(query: string, count: number): Promise<string> {
 		signal: AbortSignal.timeout(15_000),
 	});
 	if (!res.ok) throw new Error(`Tavily API error: ${res.status}`);
-	const data = (await res.json()) as { answer?: string; results?: TavilyResult[] };
+	const data = (await res.json()) as {
+		answer?: string;
+		results?: TavilyResult[];
+	};
 	const lines: string[] = [];
 	if (data.answer) lines.push(`**Summary**: ${data.answer}\n`);
 	for (const [i, r] of (data.results ?? []).entries()) {
-		lines.push(`${i + 1}. **${r.title}**\n   ${r.url}\n   ${r.content.slice(0, 300)}`);
+		lines.push(
+			`${i + 1}. **${r.title}**\n   ${r.url}\n   ${r.content.slice(0, 300)}`,
+		);
 	}
 	return lines.join("\n\n");
 }
@@ -64,11 +72,19 @@ export const webSearchTool = createTool({
 		"Search the internet for current information. Returns top results with titles, URLs, and snippets. Use for news, facts, or anything needing up-to-date data.",
 	parameters: z.object({
 		query: z.string().min(1).describe("The search query"),
-		count: z.number().int().min(1).max(10).default(5).describe("Number of results (1–10)"),
+		count: z
+			.number()
+			.int()
+			.min(1)
+			.max(10)
+			.default(5)
+			.describe("Number of results (1–10)"),
 	}),
 	execute: async ({ query, count }) => {
-		if (hasBrave) return { results: await braveSearch(query, count), provider: "brave" };
-		if (hasTavily) return { results: await tavilySearch(query, count), provider: "tavily" };
+		if (hasBrave)
+			return { results: await braveSearch(query, count), provider: "brave" };
+		if (hasTavily)
+			return { results: await tavilySearch(query, count), provider: "tavily" };
 		return {
 			results:
 				"Web search is not configured. Set BRAVE_SEARCH_API_KEY or TAVILY_API_KEY in your environment.",

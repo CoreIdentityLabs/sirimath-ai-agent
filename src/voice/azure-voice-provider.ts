@@ -1,7 +1,7 @@
+import { Readable } from "node:stream";
 import { BaseVoiceProvider } from "@voltagent/voice";
 import type { ReadableStreamType } from "@voltagent/voice";
 import { AzureOpenAI } from "openai";
-import { Readable } from "node:stream";
 
 type AzureVoice =
 	| "alloy"
@@ -50,7 +50,8 @@ export class AzureVoiceProvider extends BaseVoiceProvider {
 
 		const response = await this.client.audio.speech.create({
 			model: this.ttsModel,
-			voice: this.voice as any, // AzureVoice is a string union; OpenAI SDK expects SpeechCreateParams voice
+			// biome-ignore lint/suspicious/noExplicitAny: AzureVoice is a string union; OpenAI SDK expects SpeechCreateParams voice
+			voice: this.voice as any,
 			input: inputText,
 		});
 
