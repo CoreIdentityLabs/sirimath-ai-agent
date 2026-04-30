@@ -4,7 +4,7 @@ Project quick refs (link, do not duplicate):
 
 - Product + setup overview: [README.md](../README.md)
 - Architecture, commands, env vars: [CLAUDE.md](../.claude/CLAUDE.md)
-- Feature plans live under [specs/](../specs/). Use the most recent folder's plan.md as the "current plan".
+- Current plan: [specs/006-heartbeat-proactive-reminders/plan.md](../specs/006-heartbeat-proactive-reminders/plan.md)
 
 Build/lint gates:
 

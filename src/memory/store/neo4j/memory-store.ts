@@ -420,7 +420,9 @@ export class Neo4jMemoryStore implements MemoryStore {
 				.map((r) => {
 					const type = r.get("type") as string;
 					const desc = r.get("description") as string;
-					const since = (toDateOrNull(r.get("validFrom")) ?? new Date(0)).toISOString().split("T")[0];
+					const since = (toDateOrNull(r.get("validFrom")) ?? new Date(0))
+						.toISOString()
+						.split("T")[0];
 					const superseded = r.get("validUntil")
 						? ` → superseded ${(toDateOrNull(r.get("validUntil")) ?? new Date(0)).toISOString().split("T")[0]}`
 						: "";
@@ -432,7 +434,9 @@ export class Neo4jMemoryStore implements MemoryStore {
 				.map((r) => {
 					const convId = r.get("conversationId") as string;
 					const channel = r.get("channel") as string;
-					const startedAt = (toDateOrNull(r.get("startedAt")) ?? new Date(0)).toISOString();
+					const startedAt = (
+						toDateOrNull(r.get("startedAt")) ?? new Date(0)
+					).toISOString();
 					return `- ${convId} on ${channel} at ${startedAt}`;
 				})
 				.join("\n");

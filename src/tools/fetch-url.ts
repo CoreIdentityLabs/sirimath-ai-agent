@@ -23,7 +23,10 @@ export const fetchUrlTool = createTool({
 
 		const contentType = response.headers.get("content-type") ?? "";
 		const raw = await response.text();
-		const body = raw.length > MAX_RESPONSE_CHARS ? `${raw.slice(0, MAX_RESPONSE_CHARS)}…[truncated]` : raw;
+		const body =
+			raw.length > MAX_RESPONSE_CHARS
+				? `${raw.slice(0, MAX_RESPONSE_CHARS)}…[truncated]`
+				: raw;
 
 		return {
 			status: response.status,

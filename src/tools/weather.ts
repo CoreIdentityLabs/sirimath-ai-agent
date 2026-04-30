@@ -2,18 +2,36 @@ import { createTool } from "@voltagent/core";
 import { z } from "zod";
 
 const WMO_CODES: Record<number, string> = {
-	0: "Clear sky", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
-	45: "Foggy", 48: "Icy fog", 51: "Light drizzle", 53: "Drizzle", 55: "Heavy drizzle",
-	61: "Slight rain", 63: "Moderate rain", 65: "Heavy rain",
-	71: "Slight snow", 73: "Moderate snow", 75: "Heavy snow",
-	77: "Snow grains", 80: "Slight showers", 81: "Moderate showers", 82: "Violent showers",
-	85: "Slight snow showers", 86: "Heavy snow showers",
-	95: "Thunderstorm", 96: "Thunderstorm with hail", 99: "Thunderstorm with heavy hail",
+	0: "Clear sky",
+	1: "Mainly clear",
+	2: "Partly cloudy",
+	3: "Overcast",
+	45: "Foggy",
+	48: "Icy fog",
+	51: "Light drizzle",
+	53: "Drizzle",
+	55: "Heavy drizzle",
+	61: "Slight rain",
+	63: "Moderate rain",
+	65: "Heavy rain",
+	71: "Slight snow",
+	73: "Moderate snow",
+	75: "Heavy snow",
+	77: "Snow grains",
+	80: "Slight showers",
+	81: "Moderate showers",
+	82: "Violent showers",
+	85: "Slight snow showers",
+	86: "Heavy snow showers",
+	95: "Thunderstorm",
+	96: "Thunderstorm with hail",
+	99: "Thunderstorm with heavy hail",
 };
 
 export const weatherTool = createTool({
 	name: "getWeather",
-	description: "Get the current real-time weather for a city or location using open-meteo.com. No API key required.",
+	description:
+		"Get the current real-time weather for a city or location using open-meteo.com. No API key required.",
 	parameters: z.object({
 		location: z.string().describe("The city or location to get weather for"),
 	}),
@@ -24,7 +42,14 @@ export const weatherTool = createTool({
 			{ signal: AbortSignal.timeout(10_000) },
 		);
 		if (!geoRes.ok) throw new Error(`Geocoding failed: ${geoRes.status}`);
-		const geoData = (await geoRes.json()) as { results?: { name: string; latitude: number; longitude: number; country: string }[] };
+		const geoData = (await geoRes.json()) as {
+			results?: {
+				name: string;
+				latitude: number;
+				longitude: number;
+				country: string;
+			}[];
+		};
 		const place = geoData.results?.[0];
 		if (!place) return { error: `Could not find location: ${location}` };
 
@@ -35,7 +60,12 @@ export const weatherTool = createTool({
 		);
 		if (!wxRes.ok) throw new Error(`Weather fetch failed: ${wxRes.status}`);
 		const wxData = (await wxRes.json()) as {
-			current: { temperature_2m: number; relative_humidity_2m: number; wind_speed_10m: number; weathercode: number };
+			current: {
+				temperature_2m: number;
+				relative_humidity_2m: number;
+				wind_speed_10m: number;
+				weathercode: number;
+			};
 		};
 		const c = wxData.current;
 		const condition = WMO_CODES[c.weathercode] ?? `Code ${c.weathercode}`;

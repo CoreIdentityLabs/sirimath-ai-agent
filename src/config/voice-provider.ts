@@ -39,7 +39,8 @@ export async function resolveVoiceProvider(
 				apiKey,
 				speechModel: process.env.STT_MODEL || "whisper-1",
 				ttsModel: process.env.TTS_MODEL || "tts-1",
-				voice: (process.env.TTS_VOICE || "alloy") as any, // OpenAIVoice is a string union; env var is untyped
+				// biome-ignore lint/suspicious/noExplicitAny: OpenAIVoice is a string union; env var is untyped
+				voice: (process.env.TTS_VOICE || "alloy") as any,
 			});
 			const sttModel = process.env.STT_MODEL || "whisper-1";
 			const ttsModel = process.env.TTS_MODEL || "tts-1";
@@ -84,7 +85,8 @@ export async function resolveVoiceProvider(
 				resourceName,
 				speechModel: sttModel,
 				ttsModel,
-				voice: ttsVoice as any, // OpenAIVoice is a string union; env var is untyped
+				// biome-ignore lint/suspicious/noExplicitAny: OpenAIVoice is a string union; env var is untyped
+				voice: ttsVoice as any,
 			});
 			logger.info(
 				`[voice-provider] Voice provider initialized: azure | STT: ${sttModel} | TTS: ${ttsModel} | voice: ${ttsVoice}`,

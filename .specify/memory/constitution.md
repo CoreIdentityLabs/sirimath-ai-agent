@@ -58,8 +58,8 @@ agent pipelines and enables reliable IDE tooling and refactoring.
 
 New agent capabilities MUST be introduced as typed tools created with
 `createTool`. Each tool MUST declare: a unique `name`, a human-readable
-`description`, an input Zod schema, an output Zod schema, and a pure
-`handler` function. Tools MUST be independently testable in isolation from
+`description`, an input Zod schema, an output Zod schema, and an
+`execute` function. Tools MUST be independently testable in isolation from
 the agent.
 
 **Rationale**: Encapsulated tools keep the agent surface minimal, make
