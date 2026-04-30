@@ -271,7 +271,7 @@ export class Neo4jMemoryStore implements MemoryStore {
 					WHERE related.validUntil IS NULL
 					WITH collect(DISTINCT node) + collect(DISTINCT related) AS allNodes
 					UNWIND allNodes AS m
-					WHERE m IS NOT NULL AND m.userIdentity = $userIdentity AND m.validUntil IS NULL
+					WITH m WHERE m IS NOT NULL AND m.userIdentity = $userIdentity AND m.validUntil IS NULL
 					RETURN DISTINCT m.itemId AS itemId, m.userIdentity AS userIdentity, m.type AS type,
 					  m.description AS description, m.sourceConversationId AS sourceConversationId,
 					  m.validFrom AS validFrom, m.validUntil AS validUntil, m.accessCount AS accessCount,
