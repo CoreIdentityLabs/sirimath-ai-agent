@@ -1,6 +1,6 @@
 # Quickstart: Self-Improving Memory for Sirimath (Neo4j)
 
-**Feature**: `specs/004-self-improving-memory/spec.md`
+**Feature**: `specs/005-self-improving-memory/spec.md`
 **Audience**: developer verifying the memory subsystem end-to-end.
 **Revision**: 2 — Neo4j verification path replaces the SQLite path.
 
@@ -266,12 +266,12 @@ Count MUST equal the count before the seed run.
 
 Each of the following MUST behave identically whether issued as natural language or as the explicit command:
 
-| Test | NL phrasing | Explicit command |
-|---|---|---|
-| View profile | `what do you remember about me?` | `/memory` |
-| Forget one fact | `forget that I use Stripe` | `/forget Stripe` |
-| Export | `export my memory` | `/export` |
-| Erase all | `erase everything you know about me` | `/erase` |
+| Test            | NL phrasing                          | Explicit command |
+| --------------- | ------------------------------------ | ---------------- |
+| View profile    | `what do you remember about me?`     | `/memory`        |
+| Forget one fact | `forget that I use Stripe`           | `/forget Stripe` |
+| Export          | `export my memory`                   | `/export`        |
+| Erase all       | `erase everything you know about me` | `/erase`         |
 
 For `forget` and `/erase`, expect an explicit confirmation prompt (FR-020c). Replying `yes` / the exact confirmation phrase completes the action; anything else cancels.
 

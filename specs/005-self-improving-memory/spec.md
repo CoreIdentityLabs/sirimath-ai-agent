@@ -1,6 +1,6 @@
 # Feature Specification: Self-Improving Memory for Sirimath
 
-**Feature Branch**: `004-self-improving-memory`
+**Feature Branch**: `005-self-improving-memory`
 **Created**: 2026-04-19
 **Status**: Draft
 **Input**: User description: "As a user I need to integrate a self improving feature for sirimath. Where sirimath should be able to memories conversations and related decisions based on the llm wikis and open-graph-memory. This feature should not be coupled to Telegram, since Sirimath can work on any channel. Hence this feature should be generic."
@@ -10,6 +10,7 @@
 - [LLM Wiki pattern (Karpathy)](../../src/docs/run-deep-resarch-on-https-gist-github-com-karpathy.md) — ingest → query → lint cycle, persistent compounding knowledge base
 - [open-graph-memory-mcp (CoreIdentityLabs)](../../src/docs/https-github-com-coreidentitylabs-open-graph-memor.md) — graph-based memory with entities, relationships, deep analysis, consolidation
 - [Hermes Agent (Nous Research)](../../src/docs/run-deep-research-on-https-github-com-nousresearch.md) — bounded memory files + unbounded session search, self-improving skills
+- [VoltAgent Framework (VoltAgent/voltagent)](../../src/docs/https-github-com-voltagent-voltagent-https-voltage.md) — native Memory class capabilities: conversation storage, working memory, semantic search adapters, and multi-provider storage backends already available within the framework this project is built on
 
 ---
 

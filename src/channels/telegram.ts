@@ -1,7 +1,8 @@
-import type { Agent, Voice } from "@voltagent/core";
-import type { Logger } from "@voltagent/logger";
-import { Bot, Context, InputFile } from "grammy";
 import { Readable } from "node:stream";
+import type { Voice } from "@voltagent/core";
+import type { Logger } from "@voltagent/logger";
+import { Bot, type Context, InputFile } from "grammy";
+import type { MemoryAwareAgentLike } from "../memory/index.js";
 
 function splitMessage(text: string, maxLen: number): string[] {
 	if (text.length <= maxLen) return [text];
@@ -55,7 +56,7 @@ function splitMessage(text: string, maxLen: number): string[] {
 }
 
 export async function startTelegramBot(
-	agent: Agent,
+	agent: MemoryAwareAgentLike,
 	logger: Logger,
 	voiceProvider?: Voice | null,
 ): Promise<void> {
@@ -97,7 +98,11 @@ export async function startTelegramBot(
 			return;
 		}
 
-		logger.info("[telegram] Received voice message", { userId, conversationId, fileId });
+		logger.info("[telegram] Received voice message", {
+			userId,
+			conversationId,
+			fileId,
+		});
 
 		// Download voice file from Telegram
 		let audioBuffer: Buffer;
@@ -110,8 +115,14 @@ export async function startTelegramBot(
 			}
 			audioBuffer = Buffer.from(await response.arrayBuffer());
 		} catch (err) {
-			logger.error("[telegram] Failed to download voice file", { err, userId, fileId });
-			await ctx.reply("Sorry, I couldn't download your voice message. Please try again.");
+			logger.error("[telegram] Failed to download voice file", {
+				err,
+				userId,
+				fileId,
+			});
+			await ctx.reply(
+				"Sorry, I couldn't download your voice message. Please try again.",
+			);
 			return;
 		}
 
@@ -119,49 +130,68 @@ export async function startTelegramBot(
 		let transcript: string;
 		try {
 			const audioStream = Readable.from(audioBuffer);
-			const sttResult = await voiceProvider!.listen(audioStream);
+			const sttResult = await voiceProvider?.listen(audioStream);
 			transcript = typeof sttResult === "string" ? sttResult : "";
 		} catch (err) {
 			logger.error("[telegram] STT transcription failed", { err, userId });
-			await ctx.reply("Sorry, I couldn't transcribe your voice message. Please try again or send a text message.");
+			await ctx.reply(
+				"Sorry, I couldn't transcribe your voice message. Please try again or send a text message.",
+			);
 			return;
 		}
 
 		if (!transcript.trim()) {
 			logger.warn("[telegram] Empty transcript from voice message", { userId });
-			await ctx.reply("I couldn't make out what you said. Please try again with a clearer recording.");
+			await ctx.reply(
+				"I couldn't make out what you said. Please try again with a clearer recording.",
+			);
 			return;
 		}
 
-		logger.info("[telegram] Voice transcribed", { userId, transcriptLen: transcript.length });
+		logger.info("[telegram] Voice transcribed", {
+			userId,
+			transcriptLen: transcript.length,
+		});
 
 		// Process through agent
 		let responseText: string;
 		try {
-			const result = await agent.generateText(transcript, { userId, conversationId });
-			responseText =
-				typeof result === "string"
-					? result
-					: ((result as { text?: string }).text ?? String(result));
+			const result = await agent.generateText({
+				input: transcript,
+				channel: "telegram",
+				channelUserId: userId,
+				conversationId,
+			});
+			responseText = result.text;
 		} catch (err) {
-			logger.error("[telegram] Agent error processing voice transcript", { err, userId });
-			await ctx.reply("Something went wrong while processing your message. Please try again.");
+			logger.error("[telegram] Agent error processing voice transcript", {
+				err,
+				userId,
+			});
+			await ctx.reply(
+				"Something went wrong while processing your message. Please try again.",
+			);
 			return;
 		}
 
 		// TTS: generate voice reply and send alongside text follow-up
 		let ttsSucceeded = false;
 		try {
-			const ttsStream = await voiceProvider!.speak(responseText);
-			const chunks: Buffer[] = [];
-			for await (const chunk of ttsStream) {
-				chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+			const ttsStream = await voiceProvider?.speak(responseText);
+			if (ttsStream) {
+				const chunks: Buffer[] = [];
+				for await (const chunk of ttsStream) {
+					chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+				}
+				const ttsBuffer = Buffer.concat(chunks);
+				await ctx.replyWithVoice(new InputFile(ttsBuffer, "reply.ogg"));
+				ttsSucceeded = true;
 			}
-			const ttsBuffer = Buffer.concat(chunks);
-			await ctx.replyWithVoice(new InputFile(ttsBuffer, "reply.ogg"));
-			ttsSucceeded = true;
 		} catch (err) {
-			logger.warn("[telegram] TTS failed, falling back to text-only reply", { err, userId });
+			logger.warn("[telegram] TTS failed, falling back to text-only reply", {
+				err,
+				userId,
+			});
 		}
 
 		// Always send text follow-up (FR-006: text accompanies voice reply; also fallback when TTS fails)
@@ -171,7 +201,9 @@ export async function startTelegramBot(
 		}
 
 		if (!ttsSucceeded) {
-			logger.info("[telegram] Delivered text-only reply (TTS unavailable)", { userId });
+			logger.info("[telegram] Delivered text-only reply (TTS unavailable)", {
+				userId,
+			});
 		}
 	}
 
@@ -185,6 +217,67 @@ export async function startTelegramBot(
 			await processVoiceMessage(ctx, ctx.message.audio.file_id);
 		});
 	}
+
+	// Helper: invoke memory facade with a directive, used for slash commands (T050).
+	async function sendDirective(ctx: Context, directive: string): Promise<void> {
+		const userId = ctx.from?.id?.toString() ?? "unknown";
+		const conversationId = ctx.chat?.id.toString() ?? "unknown";
+		if (allowedIds.size > 0 && !allowedIds.has(userId)) {
+			await ctx.reply("Sorry, you don't have access to this assistant.");
+			return;
+		}
+		try {
+			const result = await agent.generateText({
+				input: directive,
+				channel: "telegram",
+				channelUserId: userId,
+				conversationId,
+			});
+			const chunks = splitMessage(result.text, 4096);
+			for (const chunk of chunks) await ctx.reply(chunk);
+		} catch (err) {
+			logger.error("[telegram] slash command error", { err, userId });
+			await ctx.reply("Something went wrong. Please try again.");
+		}
+	}
+
+	// Slash commands for memory control (FR-020b / T050).
+	bot.command("memory", (ctx) =>
+		sendDirective(
+			ctx,
+			"(system directive) the user invoked /memory — call the memoryViewProfile tool and return its result in plain prose.",
+		),
+	);
+	bot.command("forget", (ctx) => {
+		const topic = ctx.match?.trim();
+		return sendDirective(
+			ctx,
+			topic
+				? `(system directive) the user invoked /forget with topic "${topic}" — call memoryForget with that topic phrase.`
+				: "(system directive) the user invoked /forget — ask them which topic or item they want to forget.",
+		);
+	});
+	bot.command("export", (ctx) =>
+		sendDirective(
+			ctx,
+			"(system directive) the user invoked /export — call the memoryExport tool and return the Markdown.",
+		),
+	);
+	bot.command("erase", (ctx) =>
+		sendDirective(
+			ctx,
+			"(system directive) the user invoked /erase — call the memoryErase tool (first call without confirm=true, so return the confirmation prompt).",
+		),
+	);
+	bot.command("link", (ctx) => {
+		const code = ctx.match?.trim();
+		return sendDirective(
+			ctx,
+			code
+				? `(system directive) the user invoked /link with pairing code "${code}" — call memoryPairConfirm with that code to link their accounts.`
+				: "(system directive) the user invoked /link — ask them to provide a pairing code (e.g. /link ABC123).",
+		);
+	});
 
 	// Handle text messages
 	bot.on("message:text", async (ctx) => {
@@ -206,17 +299,14 @@ export async function startTelegramBot(
 		});
 
 		try {
-			const result = await agent.generateText(text, {
-				userId,
+			const result = await agent.generateText({
+				input: text,
+				channel: "telegram",
+				channelUserId: userId,
 				conversationId,
 			});
 
-			const responseText =
-				typeof result === "string"
-					? result
-					: ((result as { text?: string }).text ?? String(result));
-
-			const chunks = splitMessage(responseText, 4096);
+			const chunks = splitMessage(result.text, 4096);
 			for (const chunk of chunks) {
 				await ctx.reply(chunk);
 			}

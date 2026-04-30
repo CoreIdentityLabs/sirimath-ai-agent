@@ -1,10 +1,11 @@
 # Contract: Memory Tools (LLM-callable surface)
 
-**Feature**: `specs/004-self-improving-memory/spec.md`
+**Feature**: `specs/005-self-improving-memory/spec.md`
 
 All user-control operations MUST be invocable through both natural-language intent and explicit commands (FR-020a, FR-020b). The mechanism for both is the same: a set of `createTool`-registered tools the LLM calls. Natural-language dispatch is handled by the LLM (it picks the right tool based on user intent). Explicit slash commands in channel adapters translate to injecting a directive into the user message (or calling the tool directly via VoltAgent's tool execution API, if available).
 
 Every tool below follows Principle III (Tool-Driven Extensibility):
+
 - unique `name`
 - human-readable `description`
 - Zod `parameters` schema
@@ -29,7 +30,10 @@ export const memorySearchTool = createTool({
   description:
     "Search the user's long-term memory for items relevant to a topic. Use this when the user references something from earlier conversations that is not already visible in the current context.",
   parameters: z.object({
-    query: z.string().min(2).describe("The topic or question to search memory for."),
+    query: z
+      .string()
+      .min(2)
+      .describe("The topic or question to search memory for."),
     limit: z.number().int().min(1).max(20).default(8),
   }),
   execute: async ({ query, limit }, { operationContext }) => {
@@ -52,7 +56,7 @@ export const memorySearchTool = createTool({
 
 ---
 
-## Tool: `memory_view_profile`  (FR-018)
+## Tool: `memory_view_profile` (FR-018)
 
 ```typescript
 export const memoryViewProfileTool = createTool({
@@ -68,25 +72,32 @@ export const memoryViewProfileTool = createTool({
 
 ---
 
-## Tool: `memory_forget`  (FR-017, FR-020c)
+## Tool: `memory_forget` (FR-017, FR-020c)
 
 ```typescript
 export const memoryForgetTool = createTool({
   name: "memoryForget",
   description:
     'Forget a specific remembered item by its id or by a topic phrase. Use when the user says "forget that I use Stripe" or similar. Always presents a confirmation prompt before executing.',
-  parameters: z.object({
-    itemId: z.string().optional(),
-    topic: z.string().optional(),
-    confirm: z.boolean().default(false).describe("Set true only AFTER the user has confirmed."),
-  }).refine((v) => v.itemId || v.topic, { message: "Either itemId or topic is required." }),
+  parameters: z
+    .object({
+      itemId: z.string().optional(),
+      topic: z.string().optional(),
+      confirm: z
+        .boolean()
+        .default(false)
+        .describe("Set true only AFTER the user has confirmed."),
+    })
+    .refine((v) => v.itemId || v.topic, {
+      message: "Either itemId or topic is required.",
+    }),
   execute: async (input, { operationContext }) => {
     const userIdentity = operationContext.userId;
     if (!input.confirm) {
       // Return a confirmation prompt; LLM relays it to the user.
       const candidates = input.itemId
         ? [await memoryStore.attribute(userIdentity, input.itemId)]
-        : (await memoryStore.retrieve(userIdentity, input.topic!, 3));
+        : await memoryStore.retrieve(userIdentity, input.topic!, 3);
       return {
         pending: true,
         candidates,
@@ -107,7 +118,7 @@ export const memoryForgetTool = createTool({
 
 ---
 
-## Tool: `memory_export`  (FR-019)
+## Tool: `memory_export` (FR-019)
 
 ```typescript
 export const memoryExportTool = createTool({
@@ -123,7 +134,7 @@ export const memoryExportTool = createTool({
 
 ---
 
-## Tool: `memory_erase`  (FR-020, FR-020c)
+## Tool: `memory_erase` (FR-020, FR-020c)
 
 ```typescript
 export const memoryEraseTool = createTool({
@@ -132,10 +143,16 @@ export const memoryEraseTool = createTool({
     "Permanently erase ALL memory associated with the current user. Destructive. Always requires explicit confirmation.",
   parameters: z.object({
     confirm: z.boolean().default(false),
-    confirmationPhrase: z.string().optional().describe('Exact phrase "erase my memory" to confirm.'),
+    confirmationPhrase: z
+      .string()
+      .optional()
+      .describe('Exact phrase "erase my memory" to confirm.'),
   }),
   execute: async ({ confirm, confirmationPhrase }, { operationContext }) => {
-    if (!confirm || confirmationPhrase?.trim().toLowerCase() !== "erase my memory") {
+    if (
+      !confirm ||
+      confirmationPhrase?.trim().toLowerCase() !== "erase my memory"
+    ) {
       return {
         pending: true,
         message:
@@ -150,7 +167,7 @@ export const memoryEraseTool = createTool({
 
 ---
 
-## Tool: `memory_pair_start`  (FR-028, FR-028a)
+## Tool: `memory_pair_start` (FR-028, FR-028a)
 
 ```typescript
 export const memoryPairStartTool = createTool({
@@ -174,7 +191,7 @@ export const memoryPairStartTool = createTool({
 
 ---
 
-## Tool: `memory_pair_confirm`  (FR-028a, FR-028b)
+## Tool: `memory_pair_confirm` (FR-028a, FR-028b)
 
 ```typescript
 export const memoryPairConfirmTool = createTool({
@@ -192,11 +209,15 @@ export const memoryPairConfirmTool = createTool({
     );
     if (!result.ok) {
       // FR-028b: do not leak whether a given user identity exists
-      return { ok: false, message: "That code is not valid. Please start a new pairing." };
+      return {
+        ok: false,
+        message: "That code is not valid. Please start a new pairing.",
+      };
     }
     return {
       ok: true,
-      message: "Channels linked. Your memory on this channel now matches your other one.",
+      message:
+        "Channels linked. Your memory on this channel now matches your other one.",
     };
   },
 });
@@ -204,7 +225,7 @@ export const memoryPairConfirmTool = createTool({
 
 ---
 
-## Tool: `memory_consolidate`  (FR-012, FR-016)
+## Tool: `memory_consolidate` (FR-012, FR-016)
 
 ```typescript
 export const memoryConsolidateTool = createTool({
@@ -227,7 +248,7 @@ export const memoryConsolidateTool = createTool({
 
 ---
 
-## Tool: `memory_changes`  (FR-016)
+## Tool: `memory_changes` (FR-016)
 
 ```typescript
 export const memoryChangesTool = createTool({
@@ -238,7 +259,10 @@ export const memoryChangesTool = createTool({
     limit: z.number().int().min(1).max(10).default(3),
   }),
   execute: async ({ limit }, { operationContext }) => {
-    const reports = await memoryStore.listConsolidationReports(operationContext.userId, limit);
+    const reports = await memoryStore.listConsolidationReports(
+      operationContext.userId,
+      limit,
+    );
     return {
       reports: reports.map((r) => ({
         ranAt: r.ranAt.toISOString(),
@@ -255,17 +279,17 @@ export const memoryChangesTool = createTool({
 
 ## Explicit-command mapping (FR-020b)
 
-| User-typed command on channel | Dispatches to tool |
-|---|---|
-| `/memory` | `memory_view_profile` |
-| `/forget <topic>` | `memory_forget` (first call, returns candidates) |
-| `/export` | `memory_export` |
-| `/erase` | `memory_erase` (first call, returns confirmation) |
-| `/memory link` | `memory_pair_start` |
-| `/memory link <code>` | `memory_pair_confirm` |
-| `/memory changes` | `memory_changes` |
+| User-typed command on channel | Dispatches to tool                                |
+| ----------------------------- | ------------------------------------------------- |
+| `/memory`                     | `memory_view_profile`                             |
+| `/forget <topic>`             | `memory_forget` (first call, returns candidates)  |
+| `/export`                     | `memory_export`                                   |
+| `/erase`                      | `memory_erase` (first call, returns confirmation) |
+| `/memory link`                | `memory_pair_start`                               |
+| `/memory link <code>`         | `memory_pair_confirm`                             |
+| `/memory changes`             | `memory_changes`                                  |
 
-The channel adapter does NOT implement the business logic — it injects an instruction into the LLM turn (e.g., *"The user invoked /erase. Call the memoryErase tool."*) or invokes the tool via VoltAgent's runtime API if available. This keeps the business logic single-sourced in the tool handlers (Principle V).
+The channel adapter does NOT implement the business logic — it injects an instruction into the LLM turn (e.g., _"The user invoked /erase. Call the memoryErase tool."_) or invokes the tool via VoltAgent's runtime API if available. This keeps the business logic single-sourced in the tool handlers (Principle V).
 
 ---
 
@@ -275,11 +299,11 @@ The façade is responsible for populating, on every turn:
 
 ```typescript
 operationContext = {
-  userId: string,            // resolved user_identity — NEVER the channel-native id
-  conversationId: string,    // the channel-provided conversation id
-  channel: string,           // lowercase channel name, e.g. "telegram"
-  channelNativeId: string,   // the channel's native user id (ONLY used by memoryPairConfirm)
-}
+  userId: string, // resolved user_identity — NEVER the channel-native id
+  conversationId: string, // the channel-provided conversation id
+  channel: string, // lowercase channel name, e.g. "telegram"
+  channelNativeId: string, // the channel's native user id (ONLY used by memoryPairConfirm)
+};
 ```
 
 Tools MUST only read from `operationContext.userId` for isolation. The `channelNativeId` is purposely pair-tool-only — no other tool is allowed to read it.

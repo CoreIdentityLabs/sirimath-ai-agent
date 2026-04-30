@@ -1,12 +1,13 @@
 # Phase 1 Data Model: Self-Improving Memory (Neo4j)
 
-**Feature**: `specs/004-self-improving-memory/spec.md`
+**Feature**: `specs/005-self-improving-memory/spec.md`
 **Depends on**: [research.md](./research.md)
 **Revision**: 2 — Neo4j graph model replaces the relational schema.
 
 All entities are backed by **Neo4j 5.x** nodes and relationships. Every node carries a `userIdentity` string property that is the sole isolation boundary (FR-009); every Cypher query MUST filter on it.
 
 This document specifies:
+
 - The Zod schemas (authoritative runtime types; DB-agnostic)
 - The Cypher constraints and indexes that materialize them
 - The label + relationship vocabulary
@@ -17,16 +18,16 @@ This document specifies:
 
 ## 1. Entity overview
 
-| Entity | Neo4j label | Spec FR / Section |
-|---|---|---|
-| User Identity | `:UserIdentity` | FR-025, FR-026 |
-| Channel Identity Mapping | `:ChannelIdentityMapping` | FR-026, FR-028 |
-| Pairing Code | `:PairingCode` | FR-028a |
-| User Profile | `:UserProfile` | Key Entities |
-| Conversation Record | `:ConversationRecord` | Key Entities, FR-003 |
-| Memory Item | `:MemoryItem` + one of {`:Entity`, `:Concept`, `:Decision`, `:Preference`, `:Event`} | FR-001, FR-002 |
-| Relationship | edge of type `:USES` / `:DEPENDS_ON` / `:DECIDED_TO` / `:SUPERSEDES` / `:PART_OF` / `:CONTRADICTS` / `:CLARIFIES` | FR-004 |
-| Consolidation Report | `:ConsolidationReport` | FR-016, Key Entities |
+| Entity                   | Neo4j label                                                                                                       | Spec FR / Section    |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------- | -------------------- |
+| User Identity            | `:UserIdentity`                                                                                                   | FR-025, FR-026       |
+| Channel Identity Mapping | `:ChannelIdentityMapping`                                                                                         | FR-026, FR-028       |
+| Pairing Code             | `:PairingCode`                                                                                                    | FR-028a              |
+| User Profile             | `:UserProfile`                                                                                                    | Key Entities         |
+| Conversation Record      | `:ConversationRecord`                                                                                             | Key Entities, FR-003 |
+| Memory Item              | `:MemoryItem` + one of {`:Entity`, `:Concept`, `:Decision`, `:Preference`, `:Event`}                              | FR-001, FR-002       |
+| Relationship             | edge of type `:USES` / `:DEPENDS_ON` / `:DECIDED_TO` / `:SUPERSEDES` / `:PART_OF` / `:CONTRADICTS` / `:CLARIFIES` | FR-004               |
+| Consolidation Report     | `:ConsolidationReport`                                                                                            | FR-016, Key Entities |
 
 Dual-labelling Memory Items (`:MemoryItem:Decision` etc.) lets Cypher pattern-match the type cheaply without a `WHERE m.type = 'decision'` predicate — indexes can be built per sub-label when needed.
 
@@ -43,12 +44,22 @@ export const ulid = z.string().regex(/^[0-9A-HJKMNP-TV-Z]{26}$/);
 export const channelName = z.string().regex(/^[a-z][a-z0-9_-]{1,31}$/);
 
 export const MemoryItemTypeSchema = z.enum([
-  "entity", "concept", "decision", "preference", "event",
+  "entity",
+  "concept",
+  "decision",
+  "preference",
+  "event",
 ]);
 export type MemoryItemType = z.infer<typeof MemoryItemTypeSchema>;
 
 export const RelationshipTypeSchema = z.enum([
-  "uses", "depends_on", "decided_to", "supersedes", "part_of", "contradicts", "clarifies",
+  "uses",
+  "depends_on",
+  "decided_to",
+  "supersedes",
+  "part_of",
+  "contradicts",
+  "clarifies",
 ]);
 export type RelationshipType = z.infer<typeof RelationshipTypeSchema>;
 
@@ -65,7 +76,9 @@ export const ChannelIdentityMappingSchema = z.object({
   channelUserId: z.string().min(1).max(256),
   linkedAt: z.coerce.date(),
 });
-export type ChannelIdentityMapping = z.infer<typeof ChannelIdentityMappingSchema>;
+export type ChannelIdentityMapping = z.infer<
+  typeof ChannelIdentityMappingSchema
+>;
 
 export const PairingCodeSchema = z.object({
   code: z.string().regex(/^[A-Z0-9]{6}$/),
@@ -249,27 +262,27 @@ CREATE FULLTEXT INDEX memoryItemDesc IF NOT EXISTS
 
 ### Structural relationships (fixed, not user-facing)
 
-| Edge | From | To | Purpose |
-|---|---|---|---|
-| `(ChannelIdentityMapping)-[:BELONGS_TO]->(UserIdentity)` | mapping | identity | links channel-native id to internal identity (FR-026) |
-| `(PairingCode)-[:ISSUED_BY]->(UserIdentity)` | code | identity | binds a code to its issuer (FR-028a) |
-| `(UserProfile)-[:PROFILE_OF]->(UserIdentity)` | profile | identity | 1–1 profile |
-| `(ConversationRecord)-[:WITH]->(UserIdentity)` | conversation | identity | ownership; isolation (FR-009) |
-| `(MemoryItem)-[:OWNED_BY]->(UserIdentity)` | item | identity | ownership; isolation predicate on every query |
-| `(MemoryItem)-[:SOURCED_FROM]->(ConversationRecord)` | item | conversation | attribution (FR-003, FR-010) |
-| `(ConsolidationReport)-[:RAN_FOR]->(UserIdentity)` | report | identity | ownership |
+| Edge                                                     | From         | To           | Purpose                                               |
+| -------------------------------------------------------- | ------------ | ------------ | ----------------------------------------------------- |
+| `(ChannelIdentityMapping)-[:BELONGS_TO]->(UserIdentity)` | mapping      | identity     | links channel-native id to internal identity (FR-026) |
+| `(PairingCode)-[:ISSUED_BY]->(UserIdentity)`             | code         | identity     | binds a code to its issuer (FR-028a)                  |
+| `(UserProfile)-[:PROFILE_OF]->(UserIdentity)`            | profile      | identity     | 1–1 profile                                           |
+| `(ConversationRecord)-[:WITH]->(UserIdentity)`           | conversation | identity     | ownership; isolation (FR-009)                         |
+| `(MemoryItem)-[:OWNED_BY]->(UserIdentity)`               | item         | identity     | ownership; isolation predicate on every query         |
+| `(MemoryItem)-[:SOURCED_FROM]->(ConversationRecord)`     | item         | conversation | attribution (FR-003, FR-010)                          |
+| `(ConsolidationReport)-[:RAN_FOR]->(UserIdentity)`       | report       | identity     | ownership                                             |
 
 ### Semantic relationships (user-facing, from FR-004 and the extractor)
 
-| Edge | Meaning | Confidence + description carried on edge |
-|---|---|---|
-| `(MemoryItem)-[:USES]->(MemoryItem)` | "user uses X in Y" | yes |
-| `(MemoryItem)-[:DEPENDS_ON]->(MemoryItem)` | "X depends on Y" | yes |
-| `(MemoryItem)-[:DECIDED_TO]->(MemoryItem)` | decision → chosen option | yes |
-| `(MemoryItem)-[:SUPERSEDES]->(MemoryItem)` | FR-014 | yes (strong confidence) |
-| `(MemoryItem)-[:PART_OF]->(MemoryItem)` | subsumption | yes |
-| `(MemoryItem)-[:CONTRADICTS]->(MemoryItem)` | FR-013 — flagged, not auto-resolved | yes |
-| `(MemoryItem)-[:CLARIFIES]->(MemoryItem)` | refinement | yes |
+| Edge                                        | Meaning                             | Confidence + description carried on edge |
+| ------------------------------------------- | ----------------------------------- | ---------------------------------------- |
+| `(MemoryItem)-[:USES]->(MemoryItem)`        | "user uses X in Y"                  | yes                                      |
+| `(MemoryItem)-[:DEPENDS_ON]->(MemoryItem)`  | "X depends on Y"                    | yes                                      |
+| `(MemoryItem)-[:DECIDED_TO]->(MemoryItem)`  | decision → chosen option            | yes                                      |
+| `(MemoryItem)-[:SUPERSEDES]->(MemoryItem)`  | FR-014                              | yes (strong confidence)                  |
+| `(MemoryItem)-[:PART_OF]->(MemoryItem)`     | subsumption                         | yes                                      |
+| `(MemoryItem)-[:CONTRADICTS]->(MemoryItem)` | FR-013 — flagged, not auto-resolved | yes                                      |
+| `(MemoryItem)-[:CLARIFIES]->(MemoryItem)`   | refinement                          | yes                                      |
 
 All semantic edges carry the same shape (`relationshipId`, `type`, `confidence`, `description`, `createdAt`) plus an implicit `userIdentity` (both endpoints share it — enforced at write time).
 
@@ -286,6 +299,7 @@ Dates are stored as ISO-8601 strings (Neo4j has a native `datetime` type, but Zo
 ## 6. State transitions
 
 ### `MemoryItem`
+
 ```
 created → active   (validFrom = now, validUntil = NULL)
 active  → superseded   (FR-014: new fact disagrees; validUntil = now; CREATE (:MemoryItem {new})-[:SUPERSEDES]->(old))
@@ -294,34 +308,38 @@ active  → deleted  (FR-017 explicit user forget + FR-020c confirm — DETACH D
 ```
 
 ### `PairingCode`
+
 ```
 issued    → consumed (FR-028a success path: SET consumedAt = now)
 issued    → expired  (expiresAt < now, consumedAt still NULL — purged by consolidation cleanup)
 ```
+
 - Purge rule: a daily Cypher `MATCH (p:PairingCode) WHERE p.expiresAt < datetime() - duration({days: 1}) DETACH DELETE p` runs alongside consolidation.
 - Redemption on the issuing channel is rejected before transitioning (research §7).
 
 ### `Relationship` edges
+
 - Immutable once created. Consolidation inserts new edges; stale ones are deleted. No update-in-place.
 
 ### `ConsolidationReport`
+
 - Append-only. Never updated, never deleted.
 
 ---
 
 ## 7. Validation rules (traced to FRs)
 
-| Rule | Enforced where | FR |
-|---|---|---|
-| `memory_item.sourceConversationId` must reference an existing `ConversationRecord` under the same `userIdentity` | store's `addMemoryItem` runs `MATCH (c:ConversationRecord {userIdentity:$u, conversationId:$cid}) RETURN c` first; FK-like guard | FR-003 |
-| `memory_item.description.length ∈ [3, 1024]` | Zod | FR-001 |
-| `memory_item.type` ∈ closed enum | Zod; dual-label at persist | FR-002 |
-| Relationship endpoints MUST share the same `userIdentity` | store's `addRelationship` runs a single Cypher WRITE with both `userIdentity` predicates | FR-009 |
-| Every retrieve / traverse query MUST filter by `userIdentity` | `neo4j-store.ts` takes `userIdentity` as the first positional argument on every method | FR-009, SC-003 |
-| Pairing-code lookup MUST fail if `consumedAt IS NOT NULL` OR `expiresAt < now()` | `identity.ts` Cypher: `MATCH (p:PairingCode {code:$c}) WHERE p.consumedAt IS NULL AND p.expiresAt > datetime()` | FR-028a |
-| Pairing-code redemption on `issuingChannel` rejected | `identity.ts` pre-check | research §7 |
-| Redacted spans replaced BEFORE extractor LLM call | `ingest.ts` sanitize step | FR-006 |
-| Destructive ops require confirmation state | tool handlers + pending-op state (in tool's `operationContext`) | FR-020c |
+| Rule                                                                                                             | Enforced where                                                                                                                   | FR             |
+| ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| `memory_item.sourceConversationId` must reference an existing `ConversationRecord` under the same `userIdentity` | store's `addMemoryItem` runs `MATCH (c:ConversationRecord {userIdentity:$u, conversationId:$cid}) RETURN c` first; FK-like guard | FR-003         |
+| `memory_item.description.length ∈ [3, 1024]`                                                                     | Zod                                                                                                                              | FR-001         |
+| `memory_item.type` ∈ closed enum                                                                                 | Zod; dual-label at persist                                                                                                       | FR-002         |
+| Relationship endpoints MUST share the same `userIdentity`                                                        | store's `addRelationship` runs a single Cypher WRITE with both `userIdentity` predicates                                         | FR-009         |
+| Every retrieve / traverse query MUST filter by `userIdentity`                                                    | `neo4j-store.ts` takes `userIdentity` as the first positional argument on every method                                           | FR-009, SC-003 |
+| Pairing-code lookup MUST fail if `consumedAt IS NOT NULL` OR `expiresAt < now()`                                 | `identity.ts` Cypher: `MATCH (p:PairingCode {code:$c}) WHERE p.consumedAt IS NULL AND p.expiresAt > datetime()`                  | FR-028a        |
+| Pairing-code redemption on `issuingChannel` rejected                                                             | `identity.ts` pre-check                                                                                                          | research §7    |
+| Redacted spans replaced BEFORE extractor LLM call                                                                | `ingest.ts` sanitize step                                                                                                        | FR-006         |
+| Destructive ops require confirmation state                                                                       | tool handlers + pending-op state (in tool's `operationContext`)                                                                  | FR-020c        |
 
 ---
 
