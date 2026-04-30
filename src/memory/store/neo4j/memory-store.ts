@@ -1,5 +1,5 @@
 import type { Logger } from "@voltagent/logger";
-import { isInt } from "neo4j-driver";
+import { int, isInt } from "neo4j-driver";
 import type { Driver } from "neo4j-driver";
 import { ulid } from "ulid";
 import type { MemoryStore } from "../../ports/memory-store.js";
@@ -278,7 +278,7 @@ export class Neo4jMemoryStore implements MemoryStore {
 					  m.lastAccessedAt AS lastAccessedAt, m.createdAt AS createdAt, m.redacted AS redacted
 					LIMIT $limit
 					`,
-					{ q, userIdentity, limit },
+					{ q, userIdentity, limit: int(limit) },
 				),
 			);
 
@@ -635,7 +635,7 @@ export class Neo4jMemoryStore implements MemoryStore {
 					  r.contradictionsDetected AS contradictionsDetected, r.summary AS summary
 					ORDER BY r.ranAt DESC LIMIT $limit
 					`,
-					{ userIdentity, limit },
+					{ userIdentity, limit: int(limit) },
 				),
 			);
 
