@@ -1,14 +1,14 @@
 import "dotenv/config";
 import {
-	Agent,
-	Memory,
-	VoltAgent,
-	VoltAgentObservability,
-	VoltOpsClient,
+  Agent,
+  Memory,
+  VoltAgent,
+  VoltAgentObservability,
+  VoltOpsClient,
 } from "@voltagent/core";
 import {
-	LibSQLMemoryAdapter,
-	LibSQLObservabilityAdapter,
+  LibSQLMemoryAdapter,
+  LibSQLObservabilityAdapter,
 } from "@voltagent/libsql";
 import { createPinoLogger } from "@voltagent/logger";
 import { honoServer } from "@voltagent/server-hono";
@@ -17,33 +17,33 @@ import { resolveModel } from "./config/model-provider";
 import { resolveVoiceProvider } from "./config/voice-provider";
 import { createMemorySubsystem, loadMemoryConfig } from "./memory/index.js";
 import {
-	fetchUrlTool,
-	findSkillsTool,
-	installSkillTool,
-	weatherTool,
-	webSearchEnabled,
-	webSearchTool,
+  fetchUrlTool,
+  findSkillsTool,
+  installSkillTool,
+  weatherTool,
+  webSearchEnabled,
+  webSearchTool,
 } from "./tools";
 
 // Create a logger instance
 const logger = createPinoLogger({
-	name: "sirimath-ai-agent",
-	level: "info",
+  name: "sirimath-ai-agent",
+  level: "info",
 });
 
 // Configure persistent memory (LibSQL / SQLite)
 const memory = new Memory({
-	storage: new LibSQLMemoryAdapter({
-		url: "file:./.voltagent/memory.db",
-		logger: logger.child({ component: "libsql" }),
-	}),
+  storage: new LibSQLMemoryAdapter({
+    url: "file:./.voltagent/memory.db",
+    logger: logger.child({ component: "libsql" }),
+  }),
 });
 
 // Configure persistent observability (LibSQL / SQLite)
 const observability = new VoltAgentObservability({
-	storage: new LibSQLObservabilityAdapter({
-		url: "file:./.voltagent/observability.db",
-	}),
+  storage: new LibSQLObservabilityAdapter({
+    url: "file:./.voltagent/observability.db",
+  }),
 });
 
 const model = await resolveModel();
@@ -54,9 +54,12 @@ const memoryCfg = loadMemoryConfig();
 const memorySubsystem = await createMemorySubsystem(memoryCfg, logger, model);
 
 const baseAgent = new Agent({
-	name: "sirimath-ai-agent",
-	instructions: `You are a helpful personal assistant accessible via Telegram.
-
+  name: "sirimath-ai-agent",
+  instructions: `You are a helpful personal assistant accessible via Telegram currently.
+Your Self-Identity:
+- Name: Sirimath (pronounced "see-ree-math", means "A good boy" in Sinhala)
+- Role: Personal assistant to the user. Help them with any tasks they have, and make their life easier.
+- Your Creator: Chamara Dodandeniya
 You can:
 - Chat and answer questions on any topic
 - Fetch real-time data from the internet using fetchUrl (REST APIs, JSON endpoints, plain-text pages)
@@ -73,46 +76,46 @@ When the user asks what you remember about them, use the memoryViewProfile tool.
 When the user asks to forget something, use the memoryForget tool.
 When the user asks to export their memory, use the memoryExport tool.
 When the user asks to erase all memory, use the memoryErase tool (requires confirmation).`,
-	model,
-	tools: [
-		weatherTool,
-		fetchUrlTool,
-		...(webSearchEnabled ? [webSearchTool] : []),
-		findSkillsTool,
-		installSkillTool,
-		...memorySubsystem.tools,
-	],
-	memory,
+  model,
+  tools: [
+    weatherTool,
+    fetchUrlTool,
+    ...(webSearchEnabled ? [webSearchTool] : []),
+    findSkillsTool,
+    installSkillTool,
+    ...memorySubsystem.tools,
+  ],
+  memory,
 });
 
 const agent = memorySubsystem.wrap(baseAgent);
 
 new VoltAgent({
-	agents: {
-		agent: baseAgent,
-	},
-	workflows: {},
-	server: honoServer(),
-	logger,
-	observability,
-	voltOpsClient: new VoltOpsClient({
-		publicKey: process.env.VOLTAGENT_PUBLIC_KEY || "",
-		secretKey: process.env.VOLTAGENT_SECRET_KEY || "",
-	}),
+  agents: {
+    agent: baseAgent,
+  },
+  workflows: {},
+  server: honoServer(),
+  logger,
+  observability,
+  voltOpsClient: new VoltOpsClient({
+    publicKey: process.env.VOLTAGENT_PUBLIC_KEY || "",
+    secretKey: process.env.VOLTAGENT_SECRET_KEY || "",
+  }),
 });
 
 // Graceful shutdown — drain Neo4j bolt connections before exit (T052).
 function shutdown(signal: string) {
-	logger.info(`[main] received ${signal}, shutting down`);
-	memorySubsystem.stop();
-	if (memorySubsystem.driver) {
-		memorySubsystem.driver
-			.close()
-			.catch(() => {})
-			.finally(() => process.exit(0));
-	} else {
-		process.exit(0);
-	}
+  logger.info(`[main] received ${signal}, shutting down`);
+  memorySubsystem.stop();
+  if (memorySubsystem.driver) {
+    memorySubsystem.driver
+      .close()
+      .catch(() => {})
+      .finally(() => process.exit(0));
+  } else {
+    process.exit(0);
+  }
 }
 process.once("SIGINT", () => shutdown("SIGINT"));
 process.once("SIGTERM", () => shutdown("SIGTERM"));
