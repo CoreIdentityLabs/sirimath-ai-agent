@@ -374,7 +374,7 @@ export class Neo4jMemoryStore implements MemoryStore {
 					userIdentity: pr.get("userIdentity") as string,
 					displayName: (pr.get("displayName") as string | null) ?? null,
 					preferences,
-					updatedAt: toDate(pr.get("updatedAt")),
+					updatedAt: toDateOrNull(pr.get("updatedAt")) ?? new Date(0),
 				};
 			}
 
@@ -420,9 +420,9 @@ export class Neo4jMemoryStore implements MemoryStore {
 				.map((r) => {
 					const type = r.get("type") as string;
 					const desc = r.get("description") as string;
-					const since = toDate(r.get("validFrom")).toISOString().split("T")[0];
+					const since = (toDateOrNull(r.get("validFrom")) ?? new Date(0)).toISOString().split("T")[0];
 					const superseded = r.get("validUntil")
-						? ` → superseded ${toDate(r.get("validUntil")).toISOString().split("T")[0]}`
+						? ` → superseded ${(toDateOrNull(r.get("validUntil")) ?? new Date(0)).toISOString().split("T")[0]}`
 						: "";
 					return `- [${type}] ${desc} (since ${since}${superseded})`;
 				})
@@ -432,7 +432,7 @@ export class Neo4jMemoryStore implements MemoryStore {
 				.map((r) => {
 					const convId = r.get("conversationId") as string;
 					const channel = r.get("channel") as string;
-					const startedAt = toDate(r.get("startedAt")).toISOString();
+					const startedAt = (toDateOrNull(r.get("startedAt")) ?? new Date(0)).toISOString();
 					return `- ${convId} on ${channel} at ${startedAt}`;
 				})
 				.join("\n");
@@ -608,7 +608,7 @@ export class Neo4jMemoryStore implements MemoryStore {
 				sourceConversation: {
 					conversationId: r.get("conversationId") as string,
 					channel: r.get("channel") as string,
-					startedAt: toDate(r.get("startedAt")),
+					startedAt: toDateOrNull(r.get("startedAt")) ?? new Date(0),
 				},
 			};
 		} finally {
