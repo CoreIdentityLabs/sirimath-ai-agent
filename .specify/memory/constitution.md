@@ -144,7 +144,8 @@ new frontends (WhatsApp, Slack, voice) without touching core logic.
 - **Server**: `@voltagent/server-hono` — Hono adapter; no additional
   HTTP frameworks
 - **Persistence**: `@voltagent/libsql` (LibSQL/SQLite) for memory
-  and observability; no other databases without explicit justification
+  and observability; graph-backed memory stores (e.g., Neo4j) are allowed
+  when explicitly justified in plan.md
 - **Validation**: `zod` ^3 — sole schema and validation library
 - **Linting**: Biome (`@biomejs/biome`) — ESLint and Prettier MUST
   NOT be added
