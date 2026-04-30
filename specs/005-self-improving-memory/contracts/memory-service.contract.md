@@ -1,11 +1,12 @@
 # Contract: Memory Service (internal interface)
 
-**Feature**: `specs/004-self-improving-memory/spec.md`
+**Feature**: `specs/005-self-improving-memory/spec.md`
 **Role**: The single public surface of `src/memory/` consumed by the rest of the agent.
 
 Every channel adapter, every agent tool, and every scheduled job MUST reach the memory subsystem through this interface — not by importing concrete modules or touching the SQLite file directly.
 
 This contract is the load-bearing boundary for:
+
 - **Channel independence** (FR-025–029): only the methods below are allowed to cross `src/channels/ ↔ src/memory/`.
 - **Per-user isolation** (FR-009, SC-003): every method takes `userIdentity` as its first typed argument.
 
@@ -87,7 +88,9 @@ export interface MemoryStore {
   forgetItem(userIdentity: string, itemId: string): Promise<{ ok: boolean }>;
 
   /** FR-020: complete erasure of all memory under user_identity (idempotent). */
-  eraseAll(userIdentity: string): Promise<{ deletedItems: number; deletedRecords: number }>;
+  eraseAll(
+    userIdentity: string,
+  ): Promise<{ deletedItems: number; deletedRecords: number }>;
 
   /** Attribution helper for FR-010: traces an item back to its conversation. */
   attribute(
@@ -95,7 +98,11 @@ export interface MemoryStore {
     itemId: string,
   ): Promise<{
     item: MemoryItem;
-    sourceConversation: { conversationId: string; channel: string; startedAt: Date };
+    sourceConversation: {
+      conversationId: string;
+      channel: string;
+      startedAt: Date;
+    };
   } | null>;
 
   /** FR-016: list consolidation reports, newest first. */
@@ -108,6 +115,13 @@ export interface MemoryStore {
 export interface Consolidator {
   /** FR-012..016: run one consolidation pass for a user; returns the report persisted. */
   runOnce(userIdentity: string): Promise<ConsolidationReport>;
+
+  /**
+   * Run one consolidation pass for EVERY user identity in the store.
+   * Called by the nightly scheduler. Errors for individual users are caught
+   * and logged; the loop continues for remaining users.
+   */
+  runForAllUsers(): Promise<void>;
 
   /** Starts the daily scheduled pass (once per process). Safe to call multiple times — idempotent. */
   startScheduled(): void;

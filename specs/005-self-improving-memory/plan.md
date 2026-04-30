@@ -1,6 +1,6 @@
 # Implementation Plan: Self-Improving Memory for Sirimath
 
-**Branch**: `memory-management` (spec dir: `004-self-improving-memory`) | **Date**: 2026-04-20 | **Spec**: [spec.md](./spec.md)
+**Branch**: `005-self-improving-memory` (spec dir: `005-self-improving-memory`) | **Date**: 2026-04-20 | **Spec**: [spec.md](./spec.md)
 **Revision**: 2 — Neo4j backend (replaces the LibSQL draft). See Complexity Tracking for the deviation justification.
 **Input**: Feature specification from [spec.md](./spec.md)
 
@@ -21,19 +21,20 @@ Storage is gated behind a thin `MemoryStore` port — the façade stays DB-agnos
 
 ## Technical Context
 
-| Field                               | Value                                                                                                                                                                                                                                                                            |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Language / runtime**              | TypeScript strict mode, Node 22 LTS, ES2022 target, bundler module resolution                                                                                                                                                                                                    |
-| **Primary dependencies (existing)** | `@voltagent/core` ^2.0.0, `@voltagent/libsql` ^2.0.0 (short-term conversation memory only — retained), `ai` ^6.0.x, `zod` ^3.25, `grammy` ^1.41.1, `pino` ^9.x, `ulid` (new)                                                                                                     |
-| **New dependencies**                | `neo4j-driver` ^5.26.0 (official, Apache 2.0), `ulid` ^2.3.0                                                                                                                                                                                                                     |
-| **Storage**                         | **Neo4j 5.x Community Edition** (graph: nodes + typed edges + full-text index + optional native vector index ≥5.11). LibSQL retained _only_ for VoltAgent's short-term chat history (`.voltagent/memory.db`).                                                                    |
-| **Testing**                         | Manual verification per [quickstart.md](./quickstart.md). Gate commands: `npm run typecheck`, `npm run lint`, `npm run build`. No automated test suite exists (see [CLAUDE.md](../../.claude/CLAUDE.md) Commands section).                                                       |
-| **Target platform**                 | Linux container (prod) and Windows/macOS dev hosts. Neo4j is out-of-process (operator-provisioned) — the Sirimath container does not bundle the DB.                                                                                                                              |
-| **Project type**                    | Single Node service (VoltAgent agent + grammy channel adapter). No split between frontend and backend.                                                                                                                                                                           |
-| **Performance goals**               | SC-004: retrieve() + extract() adds ≤ 1 s average to turn latency over 20 samples. SC-001: cross-session recall ≥ 90%. SC-003: zero cross-user leakage. SC-005: consolidation merges ≥ 95% of duplicates, prunes ≥ 90% of stale items with zero `decision`-type false positives. |
-| **Constraints**                     | FR-022 graceful degradation (unset/unreachable `NEO4J_URI` → agent boots stateless); FR-024 zero-extra-cost default (Neo4j Community is free; AuraDB Free tier is free; no mandatory paid vendor); FR-006 sensitive-content redaction pre-ingest.                                |
-| **Scale**                           | Single-user personal assistant today; plan for ≤ 100 concurrent users and ≤ 100k memory items per user before we need to revisit indexing strategy.                                                                                                                              |
-| **New env vars**                    | `NEO4J_URI` (default `bolt://localhost:7687`), `NEO4J_USER` (default `neo4j`), `NEO4J_PASSWORD` (required), `MEMORY_EMBEDDINGS` (optional: `provider` to enable vector re-rank), `MEMORY_CONSOLIDATION_CRON` (optional: default daily at 03:00 local).                           |
+| Field                                   | Value                                                                                                                                                                                                                                                                                                  |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Language / runtime**                  | TypeScript strict mode, Node 22 LTS, ES2022 target, bundler module resolution                                                                                                                                                                                                                          |
+| **Primary dependencies (existing)**     | `@voltagent/core` ^2.0.0, `@voltagent/libsql` ^2.0.0 (short-term conversation memory + conversation steps — retained), `ai` ^6.0.x, `zod` ^3.25, `grammy` ^1.41.1, `pino` ^9.x, `ulid` (new)                                                                                                           |
+| **VoltAgent native features leveraged** | `Memory` class Working Memory (`user`-scoped) for user profile prompt injection; conversation history + conversation steps via the existing LibSQL adapter (unchanged). VoltAgent Semantic Search and Workflow State are not needed. See [research.md §11](./research.md) for the full capability map. |
+| **New dependencies**                    | `neo4j-driver` ^5.26.0 (official, Apache 2.0), `ulid` ^2.3.0                                                                                                                                                                                                                                           |
+| **Storage**                             | **Neo4j 5.x Community Edition** (graph: nodes + typed edges + full-text index + optional native vector index ≥5.11). LibSQL retained _only_ for VoltAgent's short-term chat history (`.voltagent/memory.db`).                                                                                          |
+| **Testing**                             | Manual verification per [quickstart.md](./quickstart.md). Gate commands: `npm run typecheck`, `npm run lint`, `npm run build`. No automated test suite exists (see [CLAUDE.md](../../.claude/CLAUDE.md) Commands section).                                                                             |
+| **Target platform**                     | Linux container (prod) and Windows/macOS dev hosts. Neo4j is out-of-process (operator-provisioned) — the Sirimath container does not bundle the DB.                                                                                                                                                    |
+| **Project type**                        | Single Node service (VoltAgent agent + grammy channel adapter). No split between frontend and backend.                                                                                                                                                                                                 |
+| **Performance goals**                   | SC-004: retrieve() + extract() adds ≤ 1 s average to turn latency over 20 samples. SC-001: cross-session recall ≥ 90%. SC-003: zero cross-user leakage. SC-005: consolidation merges ≥ 95% of duplicates, prunes ≥ 90% of stale items with zero `decision`-type false positives.                       |
+| **Constraints**                         | FR-022 graceful degradation (unset/unreachable `NEO4J_URI` → agent boots stateless); FR-024 zero-extra-cost default (Neo4j Community is free; AuraDB Free tier is free; no mandatory paid vendor); FR-006 sensitive-content redaction pre-ingest.                                                      |
+| **Scale**                               | Single-user personal assistant today; plan for ≤ 100 concurrent users and ≤ 100k memory items per user before we need to revisit indexing strategy.                                                                                                                                                    |
+| **New env vars**                        | `NEO4J_URI` (default `bolt://localhost:7687`), `NEO4J_USER` (default `neo4j`), `NEO4J_PASSWORD` (required), `MEMORY_EMBEDDINGS` (optional: `provider` to enable vector re-rank), `MEMORY_CONSOLIDATION_CRON` (optional: default daily at 03:00 local).                                                 |
 
 ## Constitution Check
 
@@ -70,7 +71,7 @@ The deviation is scoped to the memory subsystem. VoltAgent's built-in short-term
 ### Documentation (this feature)
 
 ```
-specs/004-self-improving-memory/
+specs/005-self-improving-memory/
 ├── plan.md               # this file (revision 2 — Neo4j)
 ├── research.md           # Phase 0 output (revision 2 — Neo4j)
 ├── data-model.md         # Phase 1 output (revision 2 — Neo4j Cypher schema + Zod domain types)
@@ -142,7 +143,7 @@ No new top-level directories outside `src/memory/` and one new file under `src/c
 
 ## Phase 0 — Research (completed)
 
-See [research.md](./research.md) (revision 2). 11 decisions logged:
+See [research.md](./research.md) (revision 2). 12 decisions logged:
 
 1. **Storage → Neo4j 5 Community** (Apache 2.0; graph-native; free).
 2. **Driver → `neo4j-driver` ^5.26** (official, TypeScript, session-based).
@@ -155,6 +156,7 @@ See [research.md](./research.md) (revision 2). 11 decisions logged:
 9. **Façade → DB-agnostic `MemoryAwareAgent`** wrapping VoltAgent `Agent`.
 10. **Driver lifecycle → single shared driver**, session-per-request, closed on shutdown.
 11. **Testing → manual** per quickstart.md (no automated suite exists).
+12. **VoltAgent native capabilities** (§11 of research.md) — conversation history + conversation steps already covered by the existing LibSQL adapter; `user`-scoped Working Memory will be used as a dual-write path for the User Profile (automatic prompt injection for free); VoltAgent's Semantic Search and Workflow State capabilities are not needed for this feature.
 
 ## Phase 1 — Design & Contracts (completed)
 
@@ -451,6 +453,8 @@ export async function extract(
 
 ### 2.7 `src/memory/agent-facade.ts` — MemoryAwareAgent wrapper
 
+> **Working Memory integration note** (from research.md §11): VoltAgent's `user`-scoped Working Memory automatically injects a compact profile document into the system prompt every turn without an extra `retrieve()` call. The profile update path (`src/memory/control/profile.ts`) writes to both the Neo4j `UserProfile` node (for structured export/forget queries) and to VoltAgent Working Memory (for free prompt injection). As a result, the `systemPromptAdditions` block in `generateText` below carries only the FTS + k-hop memory items, not the user profile — the profile arrives via Working Memory automatically.
+
 ```typescript
 import type { Agent } from "@voltagent/core";
 import type { IdentityStore, MemoryStore } from "./ports/index.js";
@@ -480,6 +484,8 @@ export function createMemoryAwareAgent(deps: MemoryAwareAgentDeps) {
         channelUserId: args.channelUserId,
       });
 
+      // Profile facts arrive via VoltAgent Working Memory (user-scoped) automatically.
+      // Only the wider graph-retrieved Memory Items are injected here.
       const memories = await store.retrieve(userIdentity, args.input, 12);
       const memoryBlock = formatMemoriesForPrompt(memories);
 
