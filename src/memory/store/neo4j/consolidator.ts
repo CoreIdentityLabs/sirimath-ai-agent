@@ -134,7 +134,7 @@ export class Neo4jConsolidator implements Consolidator {
                WHERE n.validUntil IS NULL
                WITH collect(DISTINCT seed) + collect(DISTINCT n) AS allNodes
                UNWIND allNodes AS m
-               WHERE m IS NOT NULL AND m.validUntil IS NULL
+               WITH m WHERE m IS NOT NULL AND m.validUntil IS NULL
                RETURN DISTINCT m.itemId AS itemId, m.type AS type, m.description AS description`,
 							{ seedIds, u: userIdentity },
 						),
