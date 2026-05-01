@@ -1,4 +1,4 @@
 {
-  "integration": "claude",
-  "version": "0.7.3"
+  "integration": "copilot",
+  "version": "0.8.4"
 }
