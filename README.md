@@ -18,18 +18,19 @@ A Telegram bot that acts as your personal AI assistant. You bring your own LLM k
 
 ## Features
 
-| Capability                | Detail                                                                     |
-| ------------------------- | -------------------------------------------------------------------------- |
-| 💬 Telegram chat          | Full multi-turn conversations                                              |
-| 🎙️ Voice messages         | Send voice notes — transcribed via STT, replied to with voice + text       |
-| 🔊 Voice replies (TTS)    | Bot replies with a synthesised voice note alongside every text follow-up   |
-| 🔑 BYOK multi-provider    | 8 LLM providers switchable via env vars, zero code changes                 |
-| 🧠 Long-term memory       | Cross-session recall, per-user isolated, powered by Neo4j 5               |
-| 🌐 Web access             | `fetchUrl` (HTTP GET any endpoint), optional `webSearch` (Brave or Tavily) |
-| 🌤️ Real weather           | Live weather via open-meteo.com — no API key needed                        |
-| 🔍 Skill discovery        | Search skills.sh and install new capabilities on demand                    |
-| 🔒 Access control         | Optional allowlist via `ALLOWED_TELEGRAM_USER_IDS`                         |
-| 📊 Observability          | VoltOps dashboard (local dev + production)                                 |
+| Capability                   | Detail                                                                     |
+| ---------------------------- | -------------------------------------------------------------------------- |
+| 💬 Telegram chat             | Full multi-turn conversations                                              |
+| 🎙️ Voice messages            | Send voice notes — transcribed via STT, replied to with voice + text       |
+| 🔊 Voice replies (TTS)       | Bot replies with a synthesised voice note alongside every text follow-up   |
+| 🔑 BYOK multi-provider       | 8 LLM providers switchable via env vars, zero code changes                 |
+| 🧠 Long-term memory          | Cross-session recall, per-user isolated, powered by Neo4j 5                |
+| 🌐 Web access                | `fetchUrl` (HTTP GET any endpoint), optional `webSearch` (Brave or Tavily) |
+| 🌤️ Real weather              | Live weather via open-meteo.com — no API key needed                        |
+| 🔍 Skill discovery           | Search skills.sh and install new capabilities on demand                    |
+| 🔒 Access control            | Optional allowlist via `ALLOWED_TELEGRAM_USER_IDS`                         |
+| ⏱️ Proactive background runs | Heartbeat can execute autonomous tasks and push outbound updates           |
+| 📊 Observability             | VoltOps dashboard (local dev + production)                                 |
 
 ---
 
@@ -206,13 +207,13 @@ Schema migrations (constraints, full-text index, range indexes) run automaticall
 
 Once memory is active, these commands are available in Telegram:
 
-| Command           | Action                                                    |
-| ----------------- | --------------------------------------------------------- |
-| `/memory`         | Show your memory profile (known facts, item count)        |
-| `/forget <topic>` | Soft-delete memories matching a topic                     |
-| `/export`         | Export all your memories as Markdown                      |
-| `/erase`          | Erase **all** your memories (requires confirmation)       |
-| `/link <code>`    | Link another channel account using a pairing code         |
+| Command           | Action                                              |
+| ----------------- | --------------------------------------------------- |
+| `/memory`         | Show your memory profile (known facts, item count)  |
+| `/forget <topic>` | Soft-delete memories matching a topic               |
+| `/export`         | Export all your memories as Markdown                |
+| `/erase`          | Erase **all** your memories (requires confirmation) |
+| `/link <code>`    | Link another channel account using a pairing code   |
 
 #### Account linking across channels
 
@@ -247,6 +248,27 @@ VOLTAGENT_SECRET_KEY=
 ```
 
 Leave empty to disable telemetry (nothing is sent). Get keys at [console.voltagent.dev](https://console.voltagent.dev/tracing-setup).
+
+### Proactive Background Execution
+
+Sirimath supports two heartbeat-driven behaviors:
+
+- Reminder mode: sends a scheduled reminder nudge only.
+- Autonomous mode: runs a background task using the same interactive tool surface and sends the result proactively without waiting for a new inbound message.
+
+Autonomous background messages are delivered with the fixed prefix `Proactive update:` so they are distinguishable from ordinary reminder nudges.
+
+```env
+# Optional: cap a single autonomous background run
+BACKGROUND_RUN_TIMEOUT_MS=45000
+```
+
+Operational notes:
+
+- Autonomous tasks respect quiet-hours suppression.
+- Digest mode remains a reminder-only behavior in this feature.
+- Oversized outbound Telegram messages are split into multiple chunks automatically.
+- If a run is interrupted during process shutdown or crash recovery, it is marked failed on startup rather than silently resumed.
 
 ---
 
@@ -301,22 +323,22 @@ sirimath-ai-agent/
 
 The agent has these tools registered at runtime:
 
-| Tool                    | Trigger                               | Notes                                          |
-| ----------------------- | ------------------------------------- | ---------------------------------------------- |
-| `getWeather`            | "weather in [city]"                   | open-meteo.com, no API key needed              |
-| `fetchUrl`              | "fetch [url]" / "call this API"       | HTTP GET, returns up to 12KB                   |
-| `webSearch`             | "search for [topic]"                  | Only active when a search API key is set       |
-| `findSkills`            | "find a skill for [topic]"            | Searches skills.sh, returns top 15             |
-| `installSkill`          | Pick a number from search results     | Downloads SKILL.md to `./skills/`              |
-| `memorySearch`          | Automatic on every turn               | RAG retrieval — injects relevant facts         |
-| `memoryViewProfile`     | `/memory` or "what do you know?"      | Shows known facts and item count               |
-| `memoryForget`          | `/forget <topic>` or "forget X"       | Soft-deletes matching memories                 |
-| `memoryExport`          | `/export` or "export my memory"       | Returns all memories as Markdown               |
-| `memoryErase`           | `/erase` or "erase everything"        | Full erase with confirmation gate              |
-| `memoryConsolidate`     | "consolidate my memory" _(when model set)_ | Runs one consolidation pass on demand     |
-| `memoryChanges`         | "what changed in my memory?"          | Lists recent consolidation reports             |
-| `memoryPairStart`       | "pair my accounts"                    | Issues a 6-char linking code (15 min TTL)      |
-| `memoryPairConfirm`     | `/link <code>`                        | Redeems a pairing code to link channels        |
+| Tool                | Trigger                                    | Notes                                     |
+| ------------------- | ------------------------------------------ | ----------------------------------------- |
+| `getWeather`        | "weather in [city]"                        | open-meteo.com, no API key needed         |
+| `fetchUrl`          | "fetch [url]" / "call this API"            | HTTP GET, returns up to 12KB              |
+| `webSearch`         | "search for [topic]"                       | Only active when a search API key is set  |
+| `findSkills`        | "find a skill for [topic]"                 | Searches skills.sh, returns top 15        |
+| `installSkill`      | Pick a number from search results          | Downloads SKILL.md to `./skills/`         |
+| `memorySearch`      | Automatic on every turn                    | RAG retrieval — injects relevant facts    |
+| `memoryViewProfile` | `/memory` or "what do you know?"           | Shows known facts and item count          |
+| `memoryForget`      | `/forget <topic>` or "forget X"            | Soft-deletes matching memories            |
+| `memoryExport`      | `/export` or "export my memory"            | Returns all memories as Markdown          |
+| `memoryErase`       | `/erase` or "erase everything"             | Full erase with confirmation gate         |
+| `memoryConsolidate` | "consolidate my memory" _(when model set)_ | Runs one consolidation pass on demand     |
+| `memoryChanges`     | "what changed in my memory?"               | Lists recent consolidation reports        |
+| `memoryPairStart`   | "pair my accounts"                         | Issues a 6-char linking code (15 min TTL) |
+| `memoryPairConfirm` | `/link <code>`                             | Redeems a pairing code to link channels   |
 
 > Memory tools are only registered when `NEO4J_URI` is set and the database is reachable. In stateless mode they are omitted entirely.
 
