@@ -1,19 +1,8 @@
 import { Agent, LanguageModel, type Memory } from "@voltagent/core";
 import { HeartbeatConfigStore } from "../reminders/heartbeat-config-store.js";
 import { ReminderStore } from "../reminders/store.js";
-import {
-  createConfigureHeartbeatTool,
-  createDismissReminderTool,
-  createListRemindersTool,
-  createScheduleReminderTool,
-  createSnoozeReminderTool,
-  fetchUrlTool,
-  findSkillsTool,
-  installSkillTool,
-  weatherTool,
-  webSearchEnabled,
-  webSearchTool,
-} from "../tools/index.js";
+import { webSearchEnabled } from "../tools/index.js";
+import { buildSirimathTools, type SharedAgentDeps } from "./agent-tools.js";
 
 type BaseAgentOptions = {
   model: LanguageModel;
@@ -57,15 +46,18 @@ When the user asks to erase all memory, use the memoryErase tool (requires confi
 
 When a user mentions a task, follow-up item, or anything they want to be reminded about:
 1. Acknowledge the item naturally.
-2. BEFORE ending your response, ask: "When should I remind you about this? For example: every 6 hours, daily at 9 AM, or in 3 days."
-3. When the user replies with a cadence, call scheduleReminder with:
+2. If the user clearly wants a simple reminder, ask: "When should I remind you about this? For example: every 6 hours, daily at 9 AM, or in 3 days."
+3. If the user wants you to proactively do work on a schedule, such as checking weather, fetching updates, or sending a recurring status update without waiting for a prompt, ask for both the cadence and the exact task instruction if it is not already explicit.
+4. When the user replies with a cadence, call scheduleReminder with:
    - scheduleType: "recurring" for "every X", "daily" for "at X every day", "once" for specific time
    - intervalMs: hours * 3600000 or days * 86400000
    - timeOfDay: HH:mm 24h for daily (e.g. "09:00")
    - fireAt: ISO 8601 for once
+  - mode: "notify" for reminder-only behavior, or "autonomous" for proactive background execution
+  - executionPrompt: required when mode is "autonomous" and should capture the exact work to perform
    - userIdentity, channelId, channelUserId, conversationId from current context
-4. Confirm the next fire time to the user.
-5. If the user skips or says "don't remind me": do NOT call scheduleReminder.
+5. Confirm the next fire time to the user and whether the task is reminder-only or proactive.
+6. If the user skips or says "don't remind me": do NOT call scheduleReminder.
 
 When a user says "snooze [duration]" after a reminder:
 - Call listReminders to get the most recent delivered reminder ID.
@@ -81,19 +73,11 @@ When a user wants to configure quiet hours or daily digest (e.g. "only remind me
 - Call configureHeartbeat with the appropriate quietHoursStart, quietHoursEnd, quietDays, digestEnabled, and digestTime values.
 - Confirm the updated settings to the user.`,
     model,
-    tools: [
-      weatherTool,
-      fetchUrlTool,
-      ...(webSearchEnabled ? [webSearchTool] : []),
-      findSkillsTool,
-      installSkillTool,
-      ...memoryTools,
-      createScheduleReminderTool(reminderStore),
-      createSnoozeReminderTool(reminderStore),
-      createDismissReminderTool(reminderStore),
-      createListRemindersTool(reminderStore),
-      createConfigureHeartbeatTool(heartbeatCfgStore),
-    ],
+    tools: buildSirimathTools({
+      memoryTools,
+      reminderStore,
+      heartbeatCfgStore,
+    } satisfies SharedAgentDeps),
     memory,
   });
 }

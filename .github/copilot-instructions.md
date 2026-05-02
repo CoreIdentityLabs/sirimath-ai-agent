@@ -4,7 +4,7 @@ Project quick refs (link, do not duplicate):
 
 - Product + setup overview: [README.md](../README.md)
 - Architecture, commands, env vars: [CLAUDE.md](../.claude/CLAUDE.md)
-- Current plan: [specs/006-heartbeat-proactive-reminders/plan.md](../specs/006-heartbeat-proactive-reminders/plan.md)
+- Current plan: [specs/007-background-agent-outbound-execution/plan.md](../specs/007-background-agent-outbound-execution/plan.md)
 
 Build/lint gates:
 

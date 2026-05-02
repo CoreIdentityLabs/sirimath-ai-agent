@@ -12,11 +12,14 @@ import {
 } from "@voltagent/libsql";
 import { createPinoLogger } from "@voltagent/logger";
 import { honoServer } from "@voltagent/server-hono";
+import { createBackgroundAgent } from "./agents/background-agent.js";
 import { createBaseAgent } from "./agents/base-agent.js";
 import { startTelegramBot } from "./channels/telegram.js";
 import { resolveModel } from "./config/model-provider.js";
 import { resolveVoiceProvider } from "./config/voice-provider.js";
 import { createMemorySubsystem, loadMemoryConfig } from "./memory/index.js";
+import { BackgroundExecutionStore } from "./reminders/background-execution-store.js";
+import { BackgroundRunner } from "./reminders/background-runner.js";
 import { HeartbeatConfigStore } from "./reminders/heartbeat-config-store.js";
 import { startHeartbeat } from "./reminders/heartbeat.js";
 import { ChannelRegistry } from "./reminders/ports/channel-adapter.js";
@@ -52,7 +55,19 @@ const reminderStore = new ReminderStore(remindersDb);
 await reminderStore.migrate();
 const heartbeatCfgStore = new HeartbeatConfigStore(remindersDb);
 await heartbeatCfgStore.migrate();
+const backgroundExecutionStore = new BackgroundExecutionStore(remindersDb);
+await backgroundExecutionStore.migrate();
 const channelRegistry = new ChannelRegistry();
+
+const rawIds = process.env.ALLOWED_TELEGRAM_USER_IDS ?? "";
+const allowedTelegramUserIds: Set<string> = rawIds.trim()
+  ? new Set(
+      rawIds
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean),
+    )
+  : new Set();
 
 const baseAgent = createBaseAgent({
   model,
@@ -62,7 +77,26 @@ const baseAgent = createBaseAgent({
   heartbeatCfgStore,
 });
 
+const backgroundAgent = createBackgroundAgent({
+  model,
+  memory,
+  memoryTools: memorySubsystem.tools,
+  reminderStore,
+  heartbeatCfgStore,
+});
+
 const agent = memorySubsystem.wrap(baseAgent);
+const backgroundMemoryAgent = memorySubsystem.wrap(backgroundAgent);
+
+const backgroundRunner = new BackgroundRunner({
+  agent: backgroundMemoryAgent,
+  executionStore: backgroundExecutionStore,
+  reminderStore,
+  registry: channelRegistry,
+  log: logger,
+  timeoutMs: Number(process.env.BACKGROUND_RUN_TIMEOUT_MS ?? 45_000),
+  allowedChannelUserIds: allowedTelegramUserIds,
+});
 
 new VoltAgent({
   agents: {
@@ -88,6 +122,14 @@ if (recovered > 0) {
   });
 }
 
+const recoveredBackground =
+  await backgroundExecutionStore.recoverStaleRunning();
+if (recoveredBackground > 0) {
+  logger.warn("[main] recovered stale background executions", {
+    count: recoveredBackground,
+  });
+}
+
 const stopHeartbeat = startHeartbeat(
   reminderStore,
   heartbeatCfgStore,
@@ -97,6 +139,7 @@ const stopHeartbeat = startHeartbeat(
     cronExpression: process.env.HEARTBEAT_CRON ?? "* * * * *",
     quietHoursStart: process.env.HEARTBEAT_QUIET_START,
     quietHoursEnd: process.env.HEARTBEAT_QUIET_END,
+    backgroundRunner,
   },
 );
 
