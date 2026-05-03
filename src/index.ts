@@ -69,12 +69,20 @@ const allowedTelegramUserIds: Set<string> = rawIds.trim()
     )
   : new Set();
 
+let latestBaseAgentContext: {
+  userIdentity: string;
+  channelId: string;
+  channelUserId: string;
+  conversationId: string;
+} | null = null;
+
 const baseAgent = createBaseAgent({
   model,
   memory,
   memoryTools: memorySubsystem.tools,
   reminderStore,
   heartbeatCfgStore,
+  resolveReminderContext: () => latestBaseAgentContext,
 });
 
 const backgroundAgent = createBackgroundAgent({
@@ -85,7 +93,21 @@ const backgroundAgent = createBackgroundAgent({
   heartbeatCfgStore,
 });
 
-const agent = memorySubsystem.wrap(baseAgent);
+const agent = memorySubsystem.wrap(baseAgent, {
+  onUserContextResolved: ({
+    userIdentity,
+    channel,
+    channelUserId,
+    conversationId,
+  }) => {
+    latestBaseAgentContext = {
+      userIdentity,
+      channelId: channel,
+      channelUserId,
+      conversationId,
+    };
+  },
+});
 const backgroundMemoryAgent = memorySubsystem.wrap(backgroundAgent);
 
 const backgroundRunner = new BackgroundRunner({

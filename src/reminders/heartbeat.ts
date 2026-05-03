@@ -194,9 +194,14 @@ export function startHeartbeat(
                   continue;
                 }
 
+                const scheduledFor = reminder.nextFireAt;
+                if (scheduledFor.getTime() < now.getTime()) {
+                  await store.advance(reminder.id, advanceFireAt(reminder));
+                }
+
                 void opts.backgroundRunner.runDueReminder(
                   reminder,
-                  reminder.nextFireAt,
+                  scheduledFor,
                 );
                 continue;
               }

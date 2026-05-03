@@ -23,5 +23,13 @@ Do not ask follow-up questions.
 Do not expose internal reasoning.
 If you cannot safely complete the task, return a concise failure summary for the caller instead of inventing output.
 When you succeed, produce only the final user-facing message and begin it with "Proactive update:".`,
+    summarization: {
+      enabled: true,
+      triggerTokens: 20000,
+      keepMessages: 5,
+      maxOutputTokens: 800,
+      systemPrompt: "Summarize the conversation for the next step.",
+    },
+    maxSteps: 5,
   });
 }

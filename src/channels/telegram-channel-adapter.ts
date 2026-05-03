@@ -61,6 +61,12 @@ export class TelegramChannelAdapter implements ChannelAdapter {
   constructor(private readonly bot: Bot) {}
 
   async send({ conversationId, text }: ChannelSendOptions): Promise<void> {
+    if (!/^-?\d+$/.test(conversationId)) {
+      throw new Error(
+        `Invalid Telegram chat ID for delivery: ${conversationId}`,
+      );
+    }
+
     const chunks = splitTelegramMessage(text);
     for (const chunk of chunks) {
       await this.bot.api.sendMessage(conversationId, chunk);
