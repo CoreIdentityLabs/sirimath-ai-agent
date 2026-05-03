@@ -32,28 +32,30 @@ Telegram (text/voice) → telegram.ts → agent.generateText() → LLM provider
 
 ### Key Source Files
 
-| File | Purpose |
-|------|---------|
-| [src/index.ts](src/index.ts) | Bootstrap: wires Agent, Memory, Voice, VoltAgent server, Telegram channel |
-| [src/channels/telegram.ts](src/channels/telegram.ts) | grammy bot — handles text/voice messages, polling vs webhook, 4096-char splitting, access control |
-| [src/config/model-provider.ts](src/config/model-provider.ts) | Factory resolving `MODEL_PROVIDER` + `MODEL_ID` env vars to an AI SDK model |
-| [src/config/voice-provider.ts](src/config/voice-provider.ts) | Factory for STT/TTS (OpenAI or Azure) |
-| [src/voice/azure-voice-provider.ts](src/voice/azure-voice-provider.ts) | Custom Azure voice provider (STT + TTS via REST) |
-| [src/tools/](src/tools/) | Tool implementations: `weather`, `fetch-url`, `web-search`, `find-skills`, `install-skill` |
+| File                                                                   | Purpose                                                                                           |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| [src/index.ts](src/index.ts)                                           | Bootstrap: wires Agent, Memory, Voice, VoltAgent server, Telegram channel                         |
+| [src/channels/telegram.ts](src/channels/telegram.ts)                   | grammy bot — handles text/voice messages, polling vs webhook, 4096-char splitting, access control |
+| [src/config/model-provider.ts](src/config/model-provider.ts)           | Factory resolving `MODEL_PROVIDER` + `MODEL_ID` env vars to an AI SDK model                       |
+| [src/config/voice-provider.ts](src/config/voice-provider.ts)           | Factory for STT/TTS (OpenAI or Azure)                                                             |
+| [src/voice/azure-voice-provider.ts](src/voice/azure-voice-provider.ts) | Custom Azure voice provider (STT + TTS via REST)                                                  |
+| [src/tools/](src/tools/)                                               | Tool implementations: `weather`, `fetch-url`, `web-search`, `find-skills`, `install-skill`        |
 
 ### LLM Provider System
 
-`MODEL_PROVIDER` selects one of 7 providers at startup (no code changes needed):
+`MODEL_PROVIDER` selects one of 9 providers/endpoints at startup (no code changes needed):
 
-| `MODEL_PROVIDER` value | Key env var(s) |
-|------------------------|----------------|
-| `openai` | `OPENAI_API_KEY` |
-| `anthropic` | `ANTHROPIC_API_KEY` |
-| `google` | `GOOGLE_GENERATIVE_AI_API_KEY` |
-| `azure` | `AZURE_API_KEY`, `AZURE_RESOURCE_NAME`, `AZURE_DEPLOYMENT_NAME` |
-| `groq` | `GROQ_API_KEY` |
-| `mistral` | `MISTRAL_API_KEY` |
-| `ollama` | `OLLAMA_BASE_URL` |
+| `MODEL_PROVIDER` value | Key env var(s)                                                  |
+| ---------------------- | --------------------------------------------------------------- |
+| `openai`               | `OPENAI_API_KEY`                                                |
+| `anthropic`            | `ANTHROPIC_API_KEY`                                             |
+| `google`               | `GOOGLE_GENERATIVE_AI_API_KEY`                                  |
+| `azure`                | `AZURE_API_KEY`, `AZURE_RESOURCE_NAME`, `AZURE_DEPLOYMENT_NAME` |
+| `groq`                 | `GROQ_API_KEY`                                                  |
+| `mistral`              | `MISTRAL_API_KEY`                                               |
+| `ollama`               | `OLLAMA_BASE_URL`                                               |
+| `lmstudio`             | `LMSTUDIO_BASE_URL`                                             |
+| `openai-compatible`    | `OPENAI_COMPATIBLE_BASE_URL`, `OPENAI_COMPATIBLE_API_KEY`       |
 
 Azure uses `.chat()` explicitly to hit Chat Completions (required for reasoning models).
 
@@ -85,7 +87,7 @@ MODEL_ID=gpt-4o           # Model name for the selected provider
 OPENAI_API_KEY=           # Or whichever provider key matches MODEL_PROVIDER
 ```
 
-Optional: `VOICE_PROVIDER`, `STT_MODEL`, `TTS_MODEL`, `TTS_VOICE`, `BRAVE_SEARCH_API_KEY` or `TAVILY_API_KEY`, `ALLOWED_TELEGRAM_USER_IDS`, `TELEGRAM_MODE=webhook`, `TELEGRAM_WEBHOOK_URL`.
+Optional: `VOICE_PROVIDER`, `STT_MODEL`, `TTS_MODEL`, `TTS_VOICE`, `BRAVE_SEARCH_API_KEY` or `TAVILY_API_KEY`, `ALLOWED_TELEGRAM_USER_IDS`, `TELEGRAM_MODE=webhook`, `TELEGRAM_WEBHOOK_URL`, `LMSTUDIO_BASE_URL`, `OPENAI_COMPATIBLE_BASE_URL`, `OPENAI_COMPATIBLE_API_KEY`, `OPENAI_COMPATIBLE_NAME`.
 
 ## Production / Docker
 
@@ -104,6 +106,8 @@ The Dockerfile uses Node 22-alpine, multi-stage build, `dumb-init` for signal ha
 - **TypeScript**: strict mode, ES2022 target, bundler module resolution
 
 <!-- SPECKIT START -->
+
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
+
 <!-- SPECKIT END -->
