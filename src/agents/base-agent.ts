@@ -10,6 +10,12 @@ type BaseAgentOptions = {
   memoryTools: Array<any>;
   reminderStore: ReminderStore;
   heartbeatCfgStore: HeartbeatConfigStore;
+  resolveReminderContext?: () => {
+    userIdentity: string;
+    channelId: string;
+    channelUserId: string;
+    conversationId: string;
+  } | null;
 };
 
 export function createBaseAgent({
@@ -18,6 +24,7 @@ export function createBaseAgent({
   memoryTools,
   reminderStore,
   heartbeatCfgStore,
+  resolveReminderContext,
 }: BaseAgentOptions) {
   return new Agent({
     name: "sirimath-ai-agent",
@@ -77,7 +84,16 @@ When a user wants to configure quiet hours or daily digest (e.g. "only remind me
       memoryTools,
       reminderStore,
       heartbeatCfgStore,
+      resolveReminderContext,
     } satisfies SharedAgentDeps),
     memory,
+    summarization: {
+      enabled: true,
+      triggerTokens: 20000,
+      keepMessages: 5,
+      maxOutputTokens: 800,
+      systemPrompt: "Summarize the conversation for the next step.",
+    },
+    maxSteps: 5,
   });
 }

@@ -6,22 +6,35 @@ import type { ReminderStore } from "../reminders/store.js";
 
 const ulid = monotonicFactory();
 
-export function createScheduleReminderTool(store: ReminderStore) {
+type ScheduleReminderContext = {
+  userIdentity: string;
+  channelId: string;
+  channelUserId: string;
+  conversationId: string;
+};
+
+type ContextResolver = () => ScheduleReminderContext | null;
+
+export function createScheduleReminderTool(
+  store: ReminderStore,
+  resolveContext?: ContextResolver,
+) {
   return createTool({
     name: "scheduleReminder",
     description:
       "Schedule a proactive reminder. Call AFTER the user confirms a reminder cadence for a task or follow-up.",
     parameters: ScheduleReminderInputSchema,
     execute: async (input) => {
+      const runtimeContext = resolveContext?.();
       const id = ulid();
       const nextFireAt = nextFireAtFromSchedule(input, new Date());
       const mode = input.mode ?? "notify";
       await store.insert({
         id,
-        userIdentity: input.userIdentity,
-        channelId: input.channelId,
-        channelUserId: input.channelUserId,
-        conversationId: input.conversationId,
+        userIdentity: runtimeContext?.userIdentity ?? input.userIdentity,
+        channelId: runtimeContext?.channelId ?? input.channelId,
+        channelUserId: runtimeContext?.channelUserId ?? input.channelUserId,
+        conversationId: runtimeContext?.conversationId ?? input.conversationId,
         description: input.description,
         scheduleType: input.scheduleType,
         intervalMs: input.intervalMs ?? null,

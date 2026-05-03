@@ -18,12 +18,19 @@ export type SharedAgentDeps = {
   memoryTools: Array<any>;
   reminderStore: ReminderStore;
   heartbeatCfgStore: HeartbeatConfigStore;
+  resolveReminderContext?: () => {
+    userIdentity: string;
+    channelId: string;
+    channelUserId: string;
+    conversationId: string;
+  } | null;
 };
 
 export function buildSirimathTools({
   memoryTools,
   reminderStore,
   heartbeatCfgStore,
+  resolveReminderContext,
 }: SharedAgentDeps) {
   return [
     weatherTool,
@@ -32,7 +39,7 @@ export function buildSirimathTools({
     findSkillsTool,
     installSkillTool,
     ...memoryTools,
-    createScheduleReminderTool(reminderStore),
+    createScheduleReminderTool(reminderStore, resolveReminderContext),
     createSnoozeReminderTool(reminderStore),
     createDismissReminderTool(reminderStore),
     createListRemindersTool(reminderStore),
