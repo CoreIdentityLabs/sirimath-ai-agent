@@ -12,7 +12,7 @@
 
 ## What is this?
 
-A Telegram bot that acts as your personal AI assistant. You bring your own LLM key (OpenAI, Anthropic, Google, Azure AI Foundry, Groq, Mistral, local Ollama, or local LM Studio) — no vendor lock-in. The assistant can search the web, fetch live data, look up real-time weather, process voice messages (speech-to-text), reply with synthesised voice (text-to-speech), remember things about you across sessions, and discover + install new capabilities on demand from [skills.sh](https://skills.sh).
+A Telegram bot that acts as your personal AI assistant. You bring your own LLM key or endpoint (OpenAI, Anthropic, Google, Azure AI Foundry, Groq, Mistral, local Ollama, local LM Studio, or any OpenAI-compatible API) — no vendor lock-in. The assistant can search the web, fetch live data, look up real-time weather, process voice messages (speech-to-text), reply with synthesised voice (text-to-speech), remember things about you across sessions, and discover + install new capabilities on demand from [skills.sh](https://skills.sh).
 
 ---
 
@@ -23,7 +23,7 @@ A Telegram bot that acts as your personal AI assistant. You bring your own LLM k
 | 💬 Telegram chat             | Full multi-turn conversations                                              |
 | 🎙️ Voice messages            | Send voice notes — transcribed via STT, replied to with voice + text       |
 | 🔊 Voice replies (TTS)       | Bot replies with a synthesised voice note alongside every text follow-up   |
-| 🔑 BYOK multi-provider       | 8 LLM providers switchable via env vars, zero code changes                 |
+| 🔑 BYOK multi-provider       | 9 LLM providers/endpoints switchable via env vars, zero code changes       |
 | 🧠 Long-term memory          | Cross-session recall, per-user isolated, powered by Neo4j 5                |
 | 🌐 Web access                | `fetchUrl` (HTTP GET any endpoint), optional `webSearch` (Brave or Tavily) |
 | 🌤️ Real weather              | Live weather via open-meteo.com — no API key needed                        |
@@ -77,16 +77,17 @@ TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
 
 ### LLM Provider (pick one)
 
-| Provider          | `MODEL_PROVIDER` | Required env vars                      | Example `MODEL_ID`         |
-| ----------------- | ---------------- | -------------------------------------- | -------------------------- |
-| OpenAI            | `openai`         | `OPENAI_API_KEY`                       | `gpt-4o-mini`              |
-| Anthropic         | `anthropic`      | `ANTHROPIC_API_KEY`                    | `claude-sonnet-4-20250514` |
-| Google Gemini     | `google`         | `GOOGLE_GENERATIVE_AI_API_KEY`         | `gemini-2.0-flash-exp`     |
-| Azure AI Foundry  | `azure`          | `AZURE_API_KEY`, `AZURE_RESOURCE_NAME` | `gpt-4o` (deployment name) |
-| Groq              | `groq`           | `GROQ_API_KEY`                         | `llama-3.3-70b-versatile`  |
-| Mistral           | `mistral`        | `MISTRAL_API_KEY`                      | `mistral-large-latest`     |
-| Ollama (local)    | `ollama`         | _(none)_                               | `llama3.2`                 |
-| LM Studio (local) | `lmstudio`       | _(none)_                               | `llama-3.2-1b`             |
+| Provider                    | `MODEL_PROVIDER`    | Required env vars                      | Example `MODEL_ID`         |
+| --------------------------- | ------------------- | -------------------------------------- | -------------------------- |
+| OpenAI                      | `openai`            | `OPENAI_API_KEY`                       | `gpt-4o-mini`              |
+| Anthropic                   | `anthropic`         | `ANTHROPIC_API_KEY`                    | `claude-sonnet-4-20250514` |
+| Google Gemini               | `google`            | `GOOGLE_GENERATIVE_AI_API_KEY`         | `gemini-2.0-flash-exp`     |
+| Azure AI Foundry            | `azure`             | `AZURE_API_KEY`, `AZURE_RESOURCE_NAME` | `gpt-4o` (deployment name) |
+| Groq                        | `groq`              | `GROQ_API_KEY`                         | `llama-3.3-70b-versatile`  |
+| Mistral                     | `mistral`           | `MISTRAL_API_KEY`                      | `mistral-large-latest`     |
+| Ollama (local)              | `ollama`            | _(none)_                               | `llama3.2`                 |
+| LM Studio (local preset)    | `lmstudio`          | _(none)_                               | `llama-3.2-1b`             |
+| OpenAI-compatible (generic) | `openai-compatible` | `OPENAI_COMPATIBLE_BASE_URL`           | `meta-llama/llama-3.1-8b`  |
 
 Default when nothing is set: `openai` / `gpt-4o-mini`.
 
@@ -98,7 +99,17 @@ OPENAI_API_KEY=sk-...
 
 > **Azure note**: For Azure AI Foundry, `MODEL_ID` is your **deployment name** (not the model family name). The agent uses the Chat Completions API explicitly to ensure compatibility with reasoning models (`o1`, `o3`, `gpt-5.x`) in multi-turn conversations.
 
-> **LM Studio note**: No API key required. LM Studio must be running with its local server started (LM Studio → Local Server tab → Start Server). Override the default `http://localhost:1234/v1` endpoint via `LMSTUDIO_BASE_URL`.
+> **LM Studio note**: `lmstudio` is a convenience preset built on the generic OpenAI-compatible provider. No API key is required. LM Studio must be running with its local server started (LM Studio → Local Server tab → Start Server). Override the default `http://localhost:1234/v1` endpoint via `LMSTUDIO_BASE_URL`.
+
+> **OpenAI-compatible note**: Use `MODEL_PROVIDER=openai-compatible` for any service exposing an OpenAI-style chat endpoint, such as LiteLLM, vLLM, or a vendor proxy. Set `OPENAI_COMPATIBLE_BASE_URL` to the API base URL and `OPENAI_COMPATIBLE_API_KEY` only if the endpoint requires bearer authentication.
+
+```env
+MODEL_PROVIDER=openai-compatible
+MODEL_ID=meta-llama/llama-3.1-8b-instruct
+OPENAI_COMPATIBLE_BASE_URL=https://your-endpoint.example.com/v1
+OPENAI_COMPATIBLE_API_KEY=your_api_key_if_required
+OPENAI_COMPATIBLE_NAME=my-gateway
+```
 
 ### Telegram Options
 
