@@ -1,34 +1,35 @@
-import { Agent, LanguageModel, type Memory } from "@voltagent/core";
-import { HeartbeatConfigStore } from "../reminders/heartbeat-config-store.js";
-import { ReminderStore } from "../reminders/store.js";
+import { Agent, type LanguageModel, type Memory } from "@voltagent/core";
+import type { MemorySubsystem } from "../memory/index.js";
+import type { HeartbeatConfigStore } from "../reminders/heartbeat-config-store.js";
+import type { ReminderStore } from "../reminders/store.js";
 import { webSearchEnabled } from "../tools/index.js";
-import { buildSirimathTools, type SharedAgentDeps } from "./agent-tools.js";
+import { type SharedAgentDeps, buildSirimathTools } from "./agent-tools.js";
 
 type BaseAgentOptions = {
-  model: LanguageModel;
-  memory: Memory;
-  memoryTools: Array<any>;
-  reminderStore: ReminderStore;
-  heartbeatCfgStore: HeartbeatConfigStore;
-  resolveReminderContext?: () => {
-    userIdentity: string;
-    channelId: string;
-    channelUserId: string;
-    conversationId: string;
-  } | null;
+	model: LanguageModel;
+	memory: Memory;
+	memoryTools: MemorySubsystem["tools"];
+	reminderStore: ReminderStore;
+	heartbeatCfgStore: HeartbeatConfigStore;
+	resolveReminderContext?: () => {
+		userIdentity: string;
+		channelId: string;
+		channelUserId: string;
+		conversationId: string;
+	} | null;
 };
 
 export function createBaseAgent({
-  model,
-  memory,
-  memoryTools,
-  reminderStore,
-  heartbeatCfgStore,
-  resolveReminderContext,
+	model,
+	memory,
+	memoryTools,
+	reminderStore,
+	heartbeatCfgStore,
+	resolveReminderContext,
 }: BaseAgentOptions) {
-  return new Agent({
-    name: "sirimath-ai-agent",
-    instructions: `You are a helpful personal assistant accessible via Telegram currently.
+	return new Agent({
+		name: "sirimath-ai-agent",
+		instructions: `You are a helpful personal assistant accessible via Telegram currently.
 Your Self-Identity:
 - Name: Sirimath (pronounced "see-ree-math", means "A good boy" in Sinhala)
 - Role: Personal assistant to the user. Help them with any tasks they have, and make their life easier.
@@ -79,21 +80,21 @@ When a user asks to see their reminders: call listReminders.
 When a user wants to configure quiet hours or daily digest (e.g. "only remind me between 8 AM and 10 PM on weekdays", "send me a daily digest at 9 AM"):
 - Call configureHeartbeat with the appropriate quietHoursStart, quietHoursEnd, quietDays, digestEnabled, and digestTime values.
 - Confirm the updated settings to the user.`,
-    model,
-    tools: buildSirimathTools({
-      memoryTools,
-      reminderStore,
-      heartbeatCfgStore,
-      resolveReminderContext,
-    } satisfies SharedAgentDeps),
-    memory,
-    summarization: {
-      enabled: true,
-      triggerTokens: 20000,
-      keepMessages: 5,
-      maxOutputTokens: 800,
-      systemPrompt: "Summarize the conversation for the next step.",
-    },
-    maxSteps: 5,
-  });
+		model,
+		tools: buildSirimathTools({
+			memoryTools,
+			reminderStore,
+			heartbeatCfgStore,
+			resolveReminderContext,
+		} satisfies SharedAgentDeps),
+		memory,
+		summarization: {
+			enabled: true,
+			triggerTokens: 20000,
+			keepMessages: 5,
+			maxOutputTokens: 800,
+			systemPrompt: "Summarize the conversation for the next step.",
+		},
+		maxSteps: 5,
+	});
 }
