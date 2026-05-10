@@ -8,6 +8,7 @@ import type {
   ExtractedItem,
   ExtractedRelationship,
   MemoryItem,
+  RetrievalBundle,
   Relationship,
 } from "./schema.js";
 
@@ -32,13 +33,51 @@ export interface MemoryAwareAgentArgs {
   conversationId: string;
 }
 
-function formatMemoriesForPrompt(items: MemoryItem[]): string {
-  if (items.length === 0) return "";
-  const lines = items.map((i) => {
+function formatMemoryLines(items: MemoryItem[]): string[] {
+  return items.map((i) => {
     const since = i.validFrom.toISOString().split("T")[0];
     return `- [${i.type}] ${i.description} (known since ${since})`;
   });
-  return `[Memories about this user]\n${lines.join("\n")}\n\n`;
+}
+
+function formatRetrievalForPrompt(bundle: RetrievalBundle): string {
+  const sections: string[] = [];
+
+  if (bundle.profile) {
+    const profileLines = [
+      bundle.profile.displayName
+        ? `- Name: ${bundle.profile.displayName}`
+        : null,
+      bundle.profile.timezone ? `- Timezone: ${bundle.profile.timezone}` : null,
+      bundle.profile.locale ? `- Locale: ${bundle.profile.locale}` : null,
+      bundle.profile.homeLocation
+        ? `- Home location: ${bundle.profile.homeLocation}`
+        : null,
+      bundle.profile.summary ? `- Summary: ${bundle.profile.summary}` : null,
+      ...Object.entries(bundle.profile.preferences).map(
+        ([key, value]) => `- Preference ${key}: ${String(value)}`,
+      ),
+    ].filter(Boolean);
+
+    if (profileLines.length > 0) {
+      sections.push(`[Known User Profile]\n${profileLines.join("\n")}`);
+    }
+  }
+
+  if (bundle.matchedItems.length > 0) {
+    sections.push(
+      `[Relevant Long-Term Memories]\n${formatMemoryLines(bundle.matchedItems).join("\n")}`,
+    );
+  }
+
+  if (bundle.recentItems.length > 0) {
+    sections.push(
+      `[Recent Context]\n${formatMemoryLines(bundle.recentItems).join("\n")}`,
+    );
+  }
+
+  if (sections.length === 0) return "";
+  return `${sections.join("\n\n")}\n\n`;
 }
 
 async function ingestExtracted(
@@ -55,6 +94,7 @@ async function ingestExtracted(
       userIdentity,
       type: it.type,
       description: it.description,
+      salience: it.type === "preference" || it.type === "decision" ? 0.85 : 0.6,
       validFrom: now,
       validUntil: null,
       sourceConversationId: conversationId,
@@ -108,8 +148,11 @@ export function createMemoryAwareAgent(deps: MemoryAwareAgentDeps) {
       // Retrieve relevant memories and prepend as context.
       let memoryBlock = "";
       try {
-        const memories = await store.retrieve(userIdentity, args.input, 12);
-        memoryBlock = formatMemoriesForPrompt(memories);
+        const bundle = await store.retrieveContext(userIdentity, args.input, {
+          matchedLimit: 12,
+          recentLimit: 5,
+        });
+        memoryBlock = formatRetrievalForPrompt(bundle);
       } catch (err) {
         log.warn("[memory] retrieve failed — proceeding without context", {
           err,
@@ -155,8 +198,20 @@ export function createMemoryAwareAgent(deps: MemoryAwareAgentDeps) {
       // ConversationRecord instead of overwriting the same chat-level node.
       const recordId = ulid();
       void extract(userIdentity, args.input, responseText, args.conversationId)
-        .then(async ({ items, relationships }) => {
-          if (items.length === 0 && relationships.length === 0) return;
+        .then(async ({ profilePatch, items, relationships }) => {
+          const hasProfilePatch = Object.keys(profilePatch).length > 0;
+          if (
+            !hasProfilePatch &&
+            items.length === 0 &&
+            relationships.length === 0
+          ) {
+            return;
+          }
+
+          if (hasProfilePatch) {
+            await store.upsertProfile(userIdentity, profilePatch);
+          }
+
           await ingestExtracted(
             store,
             userIdentity,

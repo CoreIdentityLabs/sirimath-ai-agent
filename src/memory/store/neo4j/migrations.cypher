@@ -42,6 +42,12 @@ CREATE INDEX conv_user_time IF NOT EXISTS
 CREATE INDEX report_user_time IF NOT EXISTS
   FOR (r:ConsolidationReport) ON (r.userIdentity, r.ranAt);
 
+CREATE INDEX profile_updated_at IF NOT EXISTS
+  FOR (p:UserProfile) ON (p.updatedAt);
+
+CREATE INDEX mi_user_created IF NOT EXISTS
+  FOR (m:MemoryItem) ON (m.userIdentity, m.createdAt);
+
 CREATE INDEX pairing_expiry IF NOT EXISTS
   FOR (p:PairingCode) ON (p.expiresAt);
 

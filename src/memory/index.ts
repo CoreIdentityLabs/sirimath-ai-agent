@@ -174,7 +174,7 @@ export async function createMemorySubsystem(
     wrap(agent, options) {
       const extractor = model
         ? createExtractor(model, log)
-        : async () => ({ items: [], relationships: [] });
+        : async () => ({ profilePatch: {}, items: [], relationships: [] });
       return createMemoryAwareAgent({
         inner: agent,
         identity: identityStore,

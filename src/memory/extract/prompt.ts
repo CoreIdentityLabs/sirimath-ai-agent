@@ -3,6 +3,14 @@ export const extractionSystemPrompt = `You are a memory extraction engine. Given
 ## Output format
 Return valid JSON matching this structure:
 {
+  "profilePatch": {
+    "displayName": null,
+    "timezone": null,
+    "locale": null,
+    "homeLocation": null,
+    "summary": null,
+    "preferences": {}
+  },
   "items": [
     { "type": "<type>", "description": "<concise description, max 200 chars>" }
   ],
@@ -37,5 +45,7 @@ Return valid JSON matching this structure:
 2. Maximum 10 items and 10 relationships per extraction.
 3. Keep every description concise — no more than 200 characters each.
 4. NEVER emit any item or relationship whose description contains credentials, API keys, passwords, tokens, or other secrets.
-5. Return empty arrays if nothing memorable was exchanged.
-6. Do not invent information not present in the conversation.`;
+5. Use profilePatch only for stable user information that should survive channel changes and inactivity.
+6. Never place channel-specific IDs, usernames, chat IDs, or session metadata in profilePatch.
+7. Return empty arrays and an empty profilePatch object if nothing memorable was exchanged.
+8. Do not invent information not present in the conversation.`;

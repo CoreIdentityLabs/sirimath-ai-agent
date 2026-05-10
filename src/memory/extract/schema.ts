@@ -1,5 +1,6 @@
 export {
-	ExtractionResultSchema,
-	ExtractedItemSchema,
-	ExtractedRelationshipSchema,
+  ExtractedProfilePatchSchema,
+  ExtractionResultSchema,
+  ExtractedItemSchema,
+  ExtractedRelationshipSchema,
 } from "../schema.js";
