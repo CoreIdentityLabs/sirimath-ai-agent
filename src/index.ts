@@ -17,6 +17,7 @@ import { createBaseAgent } from "./agents/base-agent.js";
 import { startTelegramBot } from "./channels/telegram.js";
 import { resolveModel } from "./config/model-provider.js";
 import { resolveVoiceProvider } from "./config/voice-provider.js";
+import { resolveMemoryEmbeddingProvider } from "./memory/embedding-provider.js";
 import { createMemorySubsystem, loadMemoryConfig } from "./memory/index.js";
 import { BackgroundExecutionStore } from "./reminders/background-execution-store.js";
 import { BackgroundRunner } from "./reminders/background-runner.js";
@@ -47,7 +48,13 @@ const model = await resolveModel();
 const voiceProvider = await resolveVoiceProvider(logger);
 
 const memoryCfg = loadMemoryConfig();
-const memorySubsystem = await createMemorySubsystem(memoryCfg, logger, model);
+const memoryEmbeddingProvider = await resolveMemoryEmbeddingProvider(memoryCfg);
+const memorySubsystem = await createMemorySubsystem(
+	memoryCfg,
+	logger,
+	model,
+	memoryEmbeddingProvider,
+);
 
 // Dedicated DB for reminders — separate from the memory subsystem's memory.db
 const remindersDb = createClient({ url: "file:./.voltagent/reminders.db" });

@@ -3,6 +3,7 @@ import type { Logger } from "@voltagent/logger";
 import type { LanguageModel } from "ai";
 import type { Driver } from "neo4j-driver";
 import type { MemoryConfig } from "./config.js";
+import type { MemoryEmbeddingProvider } from "./embedding-provider.js";
 import type { Consolidator } from "./ports/consolidator.js";
 import type { IdentityStore } from "./ports/identity-store.js";
 import type { MemoryStore } from "./ports/memory-store.js";
@@ -25,6 +26,7 @@ export interface MemorySubsystem {
 	memoryStore: MemoryStore;
 	consolidator: Consolidator;
 	driver: Driver | null;
+	embeddingProvider: MemoryEmbeddingProvider | null;
 	// biome-ignore lint/suspicious/noExplicitAny: tool generics are invariant across Zod schema variants
 	tools: Tool<any, any>[];
 	/** Stop scheduler (call on process shutdown). */
@@ -49,6 +51,10 @@ export interface MemoryAwareAgentLike {
 		channel: string;
 		channelUserId: string;
 		conversationId: string;
+		executionKind?: "interactive" | "background";
+		includeRecentMemory?: boolean;
+		persistConversation?: boolean;
+		persistExtractedMemory?: boolean;
 	}): Promise<{ text: string }>;
 }
 
@@ -58,6 +64,7 @@ export async function createMemorySubsystem(
 	cfg: MemoryConfig,
 	log: Logger,
 	model?: LanguageModel,
+	embeddingProvider?: MemoryEmbeddingProvider | null,
 ): Promise<MemorySubsystem> {
 	const driver = await createNeo4jDriver(cfg, log);
 
@@ -70,6 +77,7 @@ export async function createMemorySubsystem(
 			memoryStore: noopMemoryStore,
 			consolidator: noopConsolidator,
 			driver: null,
+			embeddingProvider: null,
 			tools,
 			stop() {},
 			wrap(agent, options) {
@@ -79,6 +87,10 @@ export async function createMemorySubsystem(
 						channel,
 						channelUserId,
 						conversationId,
+						executionKind: _executionKind,
+						includeRecentMemory: _includeRecentMemory,
+						persistConversation: _persistConversation,
+						persistExtractedMemory: _persistExtractedMemory,
 					}) {
 						options?.onUserContextResolved?.({
 							userIdentity: channelUserId,
@@ -101,7 +113,7 @@ export async function createMemorySubsystem(
 		};
 	}
 
-	await runMigrations(driver, cfg, log);
+	await runMigrations(driver, cfg, log, embeddingProvider);
 
 	// Lazy imports to avoid loading Neo4j-dependent modules when driver is null
 	const [
@@ -167,6 +179,7 @@ export async function createMemorySubsystem(
 		memoryStore,
 		consolidator,
 		driver,
+		embeddingProvider: embeddingProvider ?? null,
 		tools,
 		stop() {
 			stopScheduler();
@@ -180,6 +193,7 @@ export async function createMemorySubsystem(
 				identity: identityStore,
 				store: memoryStore,
 				extract: extractor,
+				embeddingProvider: embeddingProvider ?? null,
 				log,
 				onUserContextResolved: options?.onUserContextResolved,
 			});

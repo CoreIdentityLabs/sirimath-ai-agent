@@ -207,12 +207,35 @@ NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=test
 
-# Optional — enable vector similarity retrieval
-# (requires your LLM provider to support embeddings)
-# MEMORY_EMBEDDINGS=provider
+# Optional — enable hybrid keyword + vector retrieval
+MEMORY_EMBEDDINGS=provider
+
+# Optional — use a dedicated embedding provider instead of MODEL_PROVIDER
+# MEMORY_EMBEDDING_PROVIDER=lmstudio
+
+# Required when MEMORY_EMBEDDINGS=provider
+# Use a deployment/model name valid for the chosen embedding provider
+# MEMORY_EMBEDDING_MODEL=text-embedding-nomic-embed-text-v1.5
+
+# Optional — custom embedding endpoint for local/openai-compatible providers
+# MEMORY_EMBEDDING_BASE_URL=http://localhost:1234/v1
+
+# Optional — auth and provider label for generic OpenAI-compatible endpoints
+# MEMORY_EMBEDDING_API_KEY=
+# MEMORY_EMBEDDING_PROVIDER_NAME=local-embed
+
+# Optional — pin vector dimensions instead of probing the model on startup
+# MEMORY_EMBEDDING_DIMENSIONS=768
 ```
 
 Schema migrations (constraints, full-text index, range indexes) run automatically on first boot — no manual steps required.
+
+Embedding notes:
+
+- Memory embeddings are independent from `MODEL_PROVIDER`; you can chat with one provider and embed with another.
+- Local models are supported through `lmstudio` or `openai-compatible` embedding providers.
+- Azure requires an embedding deployment name in `MEMORY_EMBEDDING_MODEL`.
+- Existing memories created before embeddings are enabled will not have vectors until they are re-ingested or backfilled.
 
 #### Slash commands
 

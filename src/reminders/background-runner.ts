@@ -156,9 +156,13 @@ export class BackgroundRunner {
 			const result = await this.withTimeout(
 				this.deps.agent.generateText({
 					input: this.buildPrompt(reminder),
-					channel: reminder.channelId,
+					channel: `${reminder.channelId}_background`,
 					channelUserId: reminder.channelUserId,
 					conversationId: reminder.conversationId,
+					executionKind: "background",
+					includeRecentMemory: false,
+					persistConversation: false,
+					persistExtractedMemory: false,
 				}),
 				this.deps.timeoutMs,
 			);

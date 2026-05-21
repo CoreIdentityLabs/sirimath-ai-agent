@@ -56,6 +56,12 @@ function parsePreferences(value: unknown): Record<string, unknown> {
 }
 
 function mapMemoryItem(rec: AnyRecord): MemoryItem {
+	let embedding: unknown;
+	try {
+		embedding = rec.get("embedding");
+	} catch {
+		embedding = undefined;
+	}
 	return {
 		itemId: rec.get("itemId") as string,
 		userIdentity: rec.get("userIdentity") as string,
@@ -69,7 +75,22 @@ function mapMemoryItem(rec: AnyRecord): MemoryItem {
 		lastAccessedAt: toDateOrNull(rec.get("lastAccessedAt")),
 		createdAt: toDate(rec.get("createdAt")),
 		redacted: (rec.get("redacted") as boolean | null | undefined) ?? false,
+		embedding: Array.isArray(embedding) ? (embedding as number[]) : undefined,
 	};
+}
+
+function cosineSimilarity(a: number[], b: number[]): number {
+	if (a.length === 0 || a.length !== b.length) return 0;
+	let dot = 0;
+	let normA = 0;
+	let normB = 0;
+	for (let index = 0; index < a.length; index++) {
+		dot += a[index] * b[index];
+		normA += a[index] * a[index];
+		normB += b[index] * b[index];
+	}
+	const denom = Math.sqrt(normA) * Math.sqrt(normB);
+	return denom === 0 ? 0 : dot / denom;
 }
 
 function mapUserProfile(rec: AnyRecord): UserProfile | null {
@@ -119,8 +140,8 @@ export class Neo4jMemoryStore implements MemoryStore {
 				tx.run(
 					`
 					MERGE (c:ConversationRecord {userIdentity: $userIdentity, conversationId: $conversationId})
-					ON CREATE SET c.channel = $channel, c.startedAt = $startedAt, c.transcript = $transcript
-					ON MATCH SET c.endedAt = $endedAt, c.transcript = $transcript
+					ON CREATE SET c.channel = $channel, c.kind = $kind, c.startedAt = $startedAt, c.transcript = $transcript
+					ON MATCH SET c.channel = $channel, c.kind = $kind, c.endedAt = $endedAt, c.transcript = $transcript
 					MERGE (u:UserIdentity {userIdentity: $userIdentity})
 					MERGE (c)-[:WITH]->(u)
 					`,
@@ -128,6 +149,7 @@ export class Neo4jMemoryStore implements MemoryStore {
 						userIdentity: record.userIdentity,
 						conversationId: record.conversationId,
 						channel: record.channel,
+						kind: record.kind,
 						startedAt: record.startedAt.toISOString(),
 						endedAt: record.endedAt?.toISOString() ?? null,
 						transcript: JSON.stringify(
@@ -187,7 +209,8 @@ export class Neo4jMemoryStore implements MemoryStore {
 					  m.accessCount = 0,
 					  m.lastAccessedAt = null,
 					  m.createdAt = $createdAt,
-					  m.redacted = $redacted
+					  m.redacted = $redacted,
+					  m.embedding = $embedding
 					MERGE (u:UserIdentity {userIdentity: $userIdentity})
 					MERGE (c:ConversationRecord {userIdentity: $userIdentity, conversationId: $sourceConversationId})
 					MERGE (m)-[:OWNED_BY]->(u)
@@ -203,6 +226,7 @@ export class Neo4jMemoryStore implements MemoryStore {
 						validFrom: item.validFrom.toISOString(),
 						createdAt: item.createdAt.toISOString(),
 						redacted: item.redacted,
+						embedding: item.embedding ?? null,
 					},
 				),
 			);
@@ -298,13 +322,20 @@ export class Neo4jMemoryStore implements MemoryStore {
 	async retrieveContext(
 		userIdentity: string,
 		query: string,
-		options?: { matchedLimit?: number; recentLimit?: number },
+		options?: {
+			matchedLimit?: number;
+			recentLimit?: number;
+			includeRecentItems?: boolean;
+			queryEmbedding?: number[];
+		},
 	): Promise<RetrievalBundle> {
 		const session = this.driver.session();
 		const t0 = Date.now();
 		try {
 			const matchedLimit = options?.matchedLimit ?? 8;
 			const recentLimit = options?.recentLimit ?? 5;
+			const includeRecentItems = options?.includeRecentItems ?? true;
+			const queryEmbedding = options?.queryEmbedding;
 			const q = sanitizeFtsQuery(query);
 			const profile = await this.getProfile(userIdentity);
 			const matchedResult = q
@@ -331,35 +362,80 @@ export class Neo4jMemoryStore implements MemoryStore {
 						),
 					)
 				: { records: [] as Array<AnyRecord> };
-			const recentResult = await session.executeRead((tx) =>
-				tx.run(
-					`
-					MATCH (m:MemoryItem {userIdentity: $userIdentity})
-					WHERE m.validUntil IS NULL AND coalesce(m.redacted, false) = false
-					RETURN m.itemId AS itemId, m.userIdentity AS userIdentity, m.type AS type,
-					  m.description AS description, m.sourceConversationId AS sourceConversationId,
-					  coalesce(m.salience, 0.5) AS salience,
-					  m.validFrom AS validFrom, m.validUntil AS validUntil, m.accessCount AS accessCount,
-					  m.lastAccessedAt AS lastAccessedAt, m.createdAt AS createdAt, m.redacted AS redacted
-					ORDER BY coalesce(m.salience, 0.5) DESC, m.createdAt DESC
-					LIMIT $limit
-					`,
-					{ userIdentity, limit: int(recentLimit) },
-				),
-			);
+			const recentResult = includeRecentItems
+				? await session.executeRead((tx) =>
+						tx.run(
+							`
+							MATCH (m:MemoryItem {userIdentity: $userIdentity})
+							WHERE m.validUntil IS NULL AND coalesce(m.redacted, false) = false
+							RETURN m.itemId AS itemId, m.userIdentity AS userIdentity, m.type AS type,
+							  m.description AS description, m.sourceConversationId AS sourceConversationId,
+							  coalesce(m.salience, 0.5) AS salience,
+							  m.validFrom AS validFrom, m.validUntil AS validUntil, m.accessCount AS accessCount,
+							  m.lastAccessedAt AS lastAccessedAt, m.createdAt AS createdAt, m.redacted AS redacted
+							ORDER BY coalesce(m.salience, 0.5) DESC, m.createdAt DESC
+							LIMIT $limit
+							`,
+							{ userIdentity, limit: int(recentLimit) },
+						),
+					)
+				: { records: [] as Array<AnyRecord> };
 			const matchedItems = matchedResult.records.map((record) =>
 				mapMemoryItem(record as AnyRecord),
 			);
+			let semanticItems: MemoryItem[] = [];
+			if (queryEmbedding && queryEmbedding.length > 0) {
+				const semanticResult = await session.executeRead((tx) =>
+					tx.run(
+						`
+						MATCH (m:MemoryItem {userIdentity: $userIdentity})
+						WHERE m.validUntil IS NULL AND m.embedding IS NOT NULL AND coalesce(m.redacted, false) = false
+						RETURN m.itemId AS itemId, m.userIdentity AS userIdentity, m.type AS type,
+						  m.description AS description, m.sourceConversationId AS sourceConversationId,
+						  coalesce(m.salience, 0.5) AS salience,
+						  m.validFrom AS validFrom, m.validUntil AS validUntil, m.accessCount AS accessCount,
+						  m.lastAccessedAt AS lastAccessedAt, m.createdAt AS createdAt, m.redacted AS redacted,
+						  m.embedding AS embedding
+						LIMIT 64
+						`,
+						{ userIdentity },
+					),
+				);
+				semanticItems = semanticResult.records
+					.map((record) => mapMemoryItem(record as AnyRecord))
+					.map((item) => ({
+						item,
+						score: item.embedding
+							? cosineSimilarity(queryEmbedding, item.embedding)
+							: 0,
+					}))
+					.filter((entry) => entry.score > 0.15)
+					.sort((left, right) => right.score - left.score)
+					.slice(0, matchedLimit)
+					.map((entry) => entry.item);
+			}
+			const mergedMatchedItems = [...matchedItems];
+			for (const semanticItem of semanticItems) {
+				if (
+					!mergedMatchedItems.some(
+						(item) => item.itemId === semanticItem.itemId,
+					)
+				) {
+					mergedMatchedItems.push(semanticItem);
+				}
+			}
+			mergedMatchedItems.splice(matchedLimit);
 			const recentItems = recentResult.records.map(mapMemoryItem);
 			this.log.info("[memory] retrieve", {
 				userIdentity,
 				durationMs: Date.now() - t0,
-				count: matchedItems.length,
+				count: mergedMatchedItems.length,
 				recentCount: recentItems.length,
 				hasProfile: Boolean(profile),
+				hasSemanticMatches: semanticItems.length > 0,
 			});
-			if (matchedItems.length > 0) {
-				const itemIds = matchedItems.map((item) => item.itemId);
+			if (mergedMatchedItems.length > 0) {
+				const itemIds = mergedMatchedItems.map((item) => item.itemId);
 				const bumpSession = this.driver.session();
 				void bumpSession
 					.executeWrite((tx) =>
@@ -377,7 +453,7 @@ export class Neo4jMemoryStore implements MemoryStore {
 						this.log.warn("[memory] access bump failed", { err }),
 					);
 			}
-			return { profile, matchedItems, recentItems };
+			return { profile, matchedItems: mergedMatchedItems, recentItems };
 		} finally {
 			await session.close();
 		}

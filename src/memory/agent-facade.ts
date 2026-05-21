@@ -1,10 +1,12 @@
 import type { Agent } from "@voltagent/core";
 import type { Logger } from "@voltagent/logger";
 import { ulid } from "ulid";
+import type { MemoryEmbeddingProvider } from "./embedding-provider.js";
 import type { Extractor } from "./extract/extractor.js";
 import type { IdentityStore } from "./ports/identity-store.js";
 import type { MemoryStore } from "./ports/memory-store.js";
 import type {
+	ConversationRecordKind,
 	ExtractedItem,
 	ExtractedRelationship,
 	MemoryItem,
@@ -17,6 +19,7 @@ export interface MemoryAwareAgentDeps {
 	identity: IdentityStore;
 	store: MemoryStore;
 	extract: Extractor;
+	embeddingProvider: MemoryEmbeddingProvider | null;
 	log: Logger;
 	onUserContextResolved?: (context: {
 		userIdentity: string;
@@ -31,6 +34,10 @@ export interface MemoryAwareAgentArgs {
 	channel: string;
 	channelUserId: string;
 	conversationId: string;
+	executionKind?: ConversationRecordKind;
+	includeRecentMemory?: boolean;
+	persistConversation?: boolean;
+	persistExtractedMemory?: boolean;
 }
 
 function formatMemoryLines(items: MemoryItem[]): string[] {
@@ -82,13 +89,20 @@ function formatRetrievalForPrompt(bundle: RetrievalBundle): string {
 
 async function ingestExtracted(
 	store: MemoryStore,
+	embeddingProvider: MemoryEmbeddingProvider | null,
 	userIdentity: string,
 	items: (ExtractedItem & { itemId: string })[],
 	rels: (ExtractedRelationship & { relationshipId: string })[],
 	conversationId: string,
 ): Promise<void> {
 	const now = new Date();
+	const embeddings = embeddingProvider
+		? await embeddingProvider.generateEmbeddingBatch(
+				items.map((item) => item.description),
+			)
+		: [];
 	for (const it of items) {
+		const embedding = embeddings.shift();
 		const item: MemoryItem = {
 			itemId: it.itemId,
 			userIdentity,
@@ -102,6 +116,7 @@ async function ingestExtracted(
 			accessCount: 0,
 			lastAccessedAt: null,
 			createdAt: now,
+			embedding,
 		};
 		await store.addMemoryItem(item);
 	}
@@ -128,11 +143,15 @@ async function ingestExtracted(
 }
 
 export function createMemoryAwareAgent(deps: MemoryAwareAgentDeps) {
-	const { inner, identity, store, extract, log } = deps;
+	const { inner, identity, store, extract, embeddingProvider, log } = deps;
 
 	return {
 		async generateText(args: MemoryAwareAgentArgs): Promise<{ text: string }> {
 			const t0 = Date.now();
+			const executionKind = args.executionKind ?? "interactive";
+			const includeRecentMemory = args.includeRecentMemory ?? true;
+			const persistConversation = args.persistConversation ?? true;
+			const persistExtractedMemory = args.persistExtractedMemory ?? true;
 			const userIdentity = await identity.resolveOrCreate(
 				args.channel,
 				args.channelUserId,
@@ -148,9 +167,14 @@ export function createMemoryAwareAgent(deps: MemoryAwareAgentDeps) {
 			// Retrieve relevant memories and prepend as context.
 			let memoryBlock = "";
 			try {
+				const queryEmbedding = embeddingProvider
+					? await embeddingProvider.generateEmbedding(args.input)
+					: undefined;
 				const bundle = await store.retrieveContext(userIdentity, args.input, {
 					matchedLimit: 12,
-					recentLimit: 5,
+					recentLimit: includeRecentMemory ? 5 : 0,
+					includeRecentItems: includeRecentMemory,
+					queryEmbedding,
 				});
 				memoryBlock = formatRetrievalForPrompt(bundle);
 			} catch (err) {
@@ -190,8 +214,13 @@ export function createMemoryAwareAgent(deps: MemoryAwareAgentDeps) {
 			log.debug("[memory] facade turn complete", {
 				userIdentity,
 				conversationId: args.conversationId,
+				executionKind,
 				durationMs: Date.now() - t0,
 			});
+
+			if (!persistConversation && !persistExtractedMemory) {
+				return { text: responseText };
+			}
 
 			// Fire-and-forget extraction — never block the reply.
 			// Use a per-turn ULID as the record ID so each message gets its own
@@ -199,8 +228,13 @@ export function createMemoryAwareAgent(deps: MemoryAwareAgentDeps) {
 			const recordId = ulid();
 			void extract(userIdentity, args.input, responseText, args.conversationId)
 				.then(async ({ profilePatch, items, relationships }) => {
+					if (!persistExtractedMemory) {
+						items = [];
+						relationships = [];
+					}
 					const hasProfilePatch = Object.keys(profilePatch).length > 0;
 					if (
+						!persistConversation &&
 						!hasProfilePatch &&
 						items.length === 0 &&
 						relationships.length === 0
@@ -214,24 +248,27 @@ export function createMemoryAwareAgent(deps: MemoryAwareAgentDeps) {
 
 					await ingestExtracted(
 						store,
+						embeddingProvider,
 						userIdentity,
 						items,
 						relationships,
 						recordId,
 					);
 
-					// Persist conversation record.
-					await store.persistConversationRecord({
-						conversationId: recordId,
-						userIdentity,
-						channel: args.channel,
-						startedAt: new Date(),
-						endedAt: new Date(),
-						transcript: [
-							{ at: new Date(), role: "user", content: args.input },
-							{ at: new Date(), role: "assistant", content: responseText },
-						],
-					});
+					if (persistConversation) {
+						await store.persistConversationRecord({
+							conversationId: recordId,
+							userIdentity,
+							channel: args.channel,
+							kind: executionKind,
+							startedAt: new Date(),
+							endedAt: new Date(),
+							transcript: [
+								{ at: new Date(), role: "user", content: args.input },
+								{ at: new Date(), role: "assistant", content: responseText },
+							],
+						});
+					}
 				})
 				.catch((err) =>
 					log.warn("[memory] ingest failed", { err, userIdentity }),

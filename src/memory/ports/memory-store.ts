@@ -27,6 +27,8 @@ export interface MemoryStore {
 		options?: {
 			matchedLimit?: number;
 			recentLimit?: number;
+			includeRecentItems?: boolean;
+			queryEmbedding?: number[];
 		},
 	): Promise<RetrievalBundle>;
 

@@ -78,6 +78,7 @@ export const ConversationRecordSchema = z.object({
 	conversationId: z.string().min(1).max(256),
 	userIdentity: ulid,
 	channel: channelName,
+	kind: z.enum(["interactive", "background"]).default("interactive"),
 	startedAt: z.coerce.date(),
 	endedAt: z.coerce.date().nullable(),
 	transcript: z.array(
@@ -89,6 +90,14 @@ export const ConversationRecordSchema = z.object({
 	),
 });
 export type ConversationRecord = z.infer<typeof ConversationRecordSchema>;
+
+export const ConversationRecordKindSchema = z.enum([
+	"interactive",
+	"background",
+]);
+export type ConversationRecordKind = z.infer<
+	typeof ConversationRecordKindSchema
+>;
 
 export const MemoryItemSchema = z.object({
 	itemId: ulid,
@@ -103,7 +112,7 @@ export const MemoryItemSchema = z.object({
 	lastAccessedAt: z.coerce.date().nullable(),
 	createdAt: z.coerce.date(),
 	redacted: z.boolean().default(false),
-	embedding: z.array(z.number()).length(1536).optional(),
+	embedding: z.array(z.number()).optional(),
 });
 export type MemoryItem = z.infer<typeof MemoryItemSchema>;
 

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import type { Logger } from "@voltagent/logger";
 import type { Driver } from "neo4j-driver";
 import type { MemoryConfig } from "../../config.js";
+import type { MemoryEmbeddingProvider } from "../../embedding-provider.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -11,6 +12,7 @@ export async function runMigrations(
 	driver: Driver,
 	config: MemoryConfig,
 	log: Logger,
+	embeddingProvider?: MemoryEmbeddingProvider | null,
 ): Promise<void> {
 	const cypher = readFileSync(join(__dirname, "migrations.cypher"), "utf-8");
 
@@ -35,12 +37,20 @@ export async function runMigrations(
 
 		// Optional vector index migration
 		if (config.memoryEmbeddings === "provider") {
+			const dimensions =
+				config.memoryEmbeddingDimensions ??
+				(await (async () => {
+					if (!embeddingProvider) return 1536;
+					const sample =
+						await embeddingProvider.generateEmbedding("memory probe");
+					return sample.length || 1536;
+				})());
 			await session.executeWrite((tx) =>
 				tx.run(
 					`CREATE VECTOR INDEX memoryItemEmbedding IF NOT EXISTS
            FOR (m:MemoryItem) ON m.embedding
            OPTIONS { indexConfig: {
-             \`vector.dimensions\`: 1536,
+             \`vector.dimensions\`: ${dimensions},
              \`vector.similarity_function\`: 'cosine'
            } }`,
 				),
