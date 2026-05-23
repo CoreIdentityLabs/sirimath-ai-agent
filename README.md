@@ -28,6 +28,7 @@ A Telegram bot that acts as your personal AI assistant. You bring your own LLM k
 | 🌐 Web access                | `fetchUrl` (HTTP GET any endpoint), optional `webSearch` (Brave or Tavily) |
 | 🌤️ Real weather              | Live weather via open-meteo.com — no API key needed                        |
 | 🔍 Skill discovery           | Search skills.sh and install new capabilities on demand                    |
+| 🧩 Installed skill awareness | List installed skills, inspect what they do, and reuse local skill guidance |
 | 🔒 Access control            | Optional allowlist via `ALLOWED_TELEGRAM_USER_IDS`                         |
 | ⏱️ Proactive background runs | Heartbeat can execute autonomous tasks and push outbound updates           |
 | 📊 Observability             | VoltOps dashboard (local dev + production)                                 |
