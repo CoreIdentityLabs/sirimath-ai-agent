@@ -14,7 +14,30 @@ interface TavilyResult {
 	score?: number;
 }
 
-async function braveSearch(query: string, count: number): Promise<string> {
+interface SearchResultItem {
+	title: string;
+	url: string;
+	snippet: string;
+	score?: number;
+}
+
+function buildGoogleSearchUrl(query: string): string {
+	return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+}
+
+function formatResults(results: SearchResultItem[]): string {
+	return results
+		.map(
+			(result, index) =>
+				`${index + 1}. **${result.title}**\n   ${result.url}\n   ${result.snippet}`,
+		)
+		.join("\n\n");
+}
+
+async function braveSearch(
+	query: string,
+	count: number,
+): Promise<SearchResultItem[]> {
 	const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${count}`;
 	const res = await fetch(url, {
 		headers: {
@@ -26,16 +49,17 @@ async function braveSearch(query: string, count: number): Promise<string> {
 	});
 	if (!res.ok) throw new Error(`Brave Search API error: ${res.status}`);
 	const data = (await res.json()) as { web?: { results?: BraveWebResult[] } };
-	const results = data.web?.results ?? [];
-	return results
-		.map(
-			(r, i) =>
-				`${i + 1}. **${r.title}**\n   ${r.url}\n   ${r.description ?? ""}`,
-		)
-		.join("\n\n");
+	return (data.web?.results ?? []).map((result) => ({
+		title: result.title,
+		url: result.url,
+		snippet: result.description ?? "",
+	}));
 }
 
-async function tavilySearch(query: string, count: number): Promise<string> {
+async function tavilySearch(
+	query: string,
+	count: number,
+): Promise<{ answer?: string; results: SearchResultItem[] }> {
 	const res = await fetch("https://api.tavily.com/search", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
@@ -52,14 +76,15 @@ async function tavilySearch(query: string, count: number): Promise<string> {
 		answer?: string;
 		results?: TavilyResult[];
 	};
-	const lines: string[] = [];
-	if (data.answer) lines.push(`**Summary**: ${data.answer}\n`);
-	for (const [i, r] of (data.results ?? []).entries()) {
-		lines.push(
-			`${i + 1}. **${r.title}**\n   ${r.url}\n   ${r.content.slice(0, 300)}`,
-		);
-	}
-	return lines.join("\n\n");
+	return {
+		answer: data.answer,
+		results: (data.results ?? []).map((result) => ({
+			title: result.title,
+			url: result.url,
+			snippet: result.content.slice(0, 300),
+			score: result.score,
+		})),
+	};
 }
 
 // Only export if a search API key is configured
@@ -69,7 +94,7 @@ const hasTavily = Boolean(process.env.TAVILY_API_KEY);
 export const webSearchTool = createTool({
 	name: "webSearch",
 	description:
-		"Search the internet for current information. Returns top results with titles, URLs, and snippets. Use for news, facts, or anything needing up-to-date data.",
+		"Search the internet for current information and return 5 to 10 links that can be passed to fetchUrl for deeper reading. Use for news, facts, and research tasks that need up-to-date sources.",
 	parameters: z.object({
 		query: z.string().min(1).describe("The search query"),
 		count: z
@@ -78,17 +103,64 @@ export const webSearchTool = createTool({
 			.min(1)
 			.max(10)
 			.default(5)
-			.describe("Number of results (1–10)"),
+			.describe(
+				"Number of results (1-10). Prefer 5-10 when you plan to inspect result pages with fetchUrl.",
+			),
 	}),
 	execute: async ({ query, count }) => {
-		if (hasBrave)
-			return { results: await braveSearch(query, count), provider: "brave" };
-		if (hasTavily)
-			return { results: await tavilySearch(query, count), provider: "tavily" };
+		const searchUrl = buildGoogleSearchUrl(query);
+
+		if (hasBrave) {
+			const results = await braveSearch(query, count);
+			return {
+				provider: "brave",
+				query,
+				searchUrl,
+				resultsSummary: formatResults(results),
+				links: results.map((result) => result.url),
+				results: results.map((result, index) => ({
+					rank: index + 1,
+					...result,
+				})),
+				nextAction:
+					"Use fetchUrl on the 5 to 10 most relevant links from the links array to extract deeper details.",
+			};
+		}
+
+		if (hasTavily) {
+			const { answer, results } = await tavilySearch(query, count);
+			const resultsSummary = [
+				answer ? `**Summary**: ${answer}` : "",
+				formatResults(results),
+			]
+				.filter(Boolean)
+				.join("\n\n");
+
+			return {
+				provider: "tavily",
+				query,
+				searchUrl,
+				resultsSummary,
+				links: results.map((result) => result.url),
+				results: results.map((result, index) => ({
+					rank: index + 1,
+					...result,
+				})),
+				nextAction:
+					"Use fetchUrl on the 5 to 10 most relevant links from the links array to extract deeper details.",
+			};
+		}
+
 		return {
-			results:
+			query,
+			searchUrl,
+			resultsSummary:
 				"Web search is not configured. Set BRAVE_SEARCH_API_KEY or TAVILY_API_KEY in your environment.",
 			provider: "none",
+			links: [],
+			results: [],
+			nextAction:
+				"Configure BRAVE_SEARCH_API_KEY or TAVILY_API_KEY so webSearch can return links for fetchUrl.",
 		};
 	},
 });

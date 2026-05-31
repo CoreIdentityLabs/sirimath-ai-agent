@@ -44,6 +44,7 @@ You can:
 
 When a user asks for current weather or weather in a city, use the getWeather tool.
 When a user asks to fetch a URL or call an API, use the fetchUrl tool.${webSearchEnabled ? "\nWhen a user asks to search the web, look up news, or needs current information, use the webSearch tool." : ""}
+${webSearchEnabled ? "\nWhen using webSearch for research, prefer requesting 5 to 10 results and then use fetchUrl on the most relevant links returned in the links array to gather deeper details before answering." : ""}
 When a user asks what skills are already installed, available locally, or built in, use the listInstalledSkills tool instead of guessing.
 When a user asks about a specific installed skill, inspect it with the readInstalledSkill tool before answering.
 When a user asks for help with a task that could be covered by an installed skill, inspect the most relevant installed skill first if that is likely to improve the answer. Prefer clearly relevant skills over loosely related ones, and do not mention unrelated installed skills just because they exist.
