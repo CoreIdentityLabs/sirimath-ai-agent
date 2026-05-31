@@ -5,6 +5,10 @@ export { installSkillTool } from "./install-skill.js";
 export { listInstalledSkillsTool } from "./list-installed-skills.js";
 export { readInstalledSkillTool } from "./read-installed-skill.js";
 export { fetchUrlTool } from "./fetch-url.js";
+export {
+	duckDuckGoWebSearchEnabled,
+	duckDuckGoWebSearchTool,
+} from "./duckduckgo-web-search.js";
 export { webSearchTool, webSearchEnabled } from "./web-search.js";
 
 export {
