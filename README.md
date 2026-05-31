@@ -25,7 +25,7 @@ A Telegram bot that acts as your personal AI assistant. You bring your own LLM k
 | 🔊 Voice replies (TTS)       | Bot replies with a synthesised voice note alongside every text follow-up   |
 | 🔑 BYOK multi-provider       | 9 LLM providers/endpoints switchable via env vars, zero code changes       |
 | 🧠 Long-term memory          | Cross-session recall, per-user isolated, powered by Neo4j 5                |
-| 🌐 Web access                | `fetchUrl` (HTTP GET any endpoint), optional `webSearch` (Brave or Tavily) |
+| 🌐 Web access                | `fetchUrl`, built-in `duckDuckGoWebSearch`, plus optional `webSearch` (Brave or Tavily) |
 | 🌤️ Real weather              | Live weather via open-meteo.com — no API key needed                        |
 | 🔍 Skill discovery           | Search skills.sh and install new capabilities on demand                    |
 | 🧩 Installed skill awareness | List installed skills, inspect what they do, and reuse local skill guidance |
@@ -261,9 +261,14 @@ To share memory between Telegram and another channel (e.g. the CLI dry-run adapt
 
 If `NEO4J_URI` is set but the database is unreachable at startup, the agent logs a warning and continues in stateless mode. If the database goes away while running, retrieval fails silently and the user gets a polite notice that memory is temporarily unavailable — the bot never crashes.
 
-### Web Search (optional)
+### Web Search
 
-Set **one** of the following to enable the `webSearch` tool:
+The agent includes two web search paths:
+
+- `duckDuckGoWebSearch` is always enabled and scrapes DuckDuckGo HTML results without requiring API keys.
+- `webSearch` is optional and uses Brave Search or Tavily when you want API-backed results.
+
+Set **one** of the following to enable the optional `webSearch` tool:
 
 ```env
 # Brave Search API — https://api.search.brave.com
@@ -273,7 +278,7 @@ Set **one** of the following to enable the `webSearch` tool:
 # TAVILY_API_KEY=your-tavily-api-key
 ```
 
-Without a search key, `fetchUrl` and `getWeather` still work fully.
+Without a search key, `duckDuckGoWebSearch`, `fetchUrl`, and `getWeather` still work fully.
 
 ### VoltOps Observability (optional)
 
@@ -339,6 +344,7 @@ sirimath-ai-agent/
 │       ├── index.ts              # Tool exports
 │       ├── weather.ts            # getWeather — real data via open-meteo.com
 │       ├── fetch-url.ts          # fetchUrl — HTTP GET any URL
+│       ├── duckduckgo-web-search.ts # duckDuckGoWebSearch — no-key web search via DuckDuckGo HTML
 │       ├── web-search.ts         # webSearch — Brave or Tavily (optional)
 │       ├── find-skills.ts        # findSkills — search skills.sh
 │       └── install-skill.ts      # installSkill — fetch & save SKILL.md
@@ -362,7 +368,8 @@ The agent has these tools registered at runtime:
 | ------------------- | ------------------------------------------ | ----------------------------------------- |
 | `getWeather`        | "weather in [city]"                        | open-meteo.com, no API key needed         |
 | `fetchUrl`          | "fetch [url]" / "call this API"            | HTTP GET, returns up to 12KB              |
-| `webSearch`         | "search for [topic]"                       | Only active when a search API key is set  |
+| `duckDuckGoWebSearch` | "search the web for [topic]"             | Always available, no API key required     |
+| `webSearch`         | "search for [topic]"                       | Active when Brave or Tavily is configured  |
 | `findSkills`        | "find a skill for [topic]"                 | Searches skills.sh, returns top 15        |
 | `installSkill`      | Pick a number from search results          | Downloads SKILL.md to `./skills/`         |
 | `memorySearch`      | Automatic on every turn                    | RAG retrieval — injects relevant facts    |
