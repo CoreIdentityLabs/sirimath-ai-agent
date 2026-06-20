@@ -10,6 +10,10 @@ export {
 	duckDuckGoWebSearchTool,
 } from "./duckduckgo-web-search.js";
 export { webSearchTool, webSearchEnabled } from "./web-search.js";
+export {
+	readToolArtifactTool,
+	searchToolArtifactTool,
+} from "./tool-artifact-tools.js";
 
 export {
 	buildInstalledSkillDetailView,

@@ -56,6 +56,19 @@ export interface MemoryAwareAgentLike {
 		persistConversation?: boolean;
 		persistExtractedMemory?: boolean;
 	}): Promise<{ text: string }>;
+	streamText(args: {
+		input: string;
+		channel: string;
+		channelUserId: string;
+		conversationId: string;
+		executionKind?: "interactive" | "background";
+		includeRecentMemory?: boolean;
+		persistConversation?: boolean;
+		persistExtractedMemory?: boolean;
+	}): Promise<{
+		textStream: AsyncIterable<string>;
+		text: Promise<string>;
+	}>;
 }
 
 const DEGRADED_FOOTER = "\n\n⚠️ Long-term memory is temporarily unavailable.";
@@ -107,6 +120,18 @@ export async function createMemorySubsystem(
 								? result
 								: ((result as { text?: string }).text ?? String(result));
 						return { text: text + DEGRADED_FOOTER };
+					},
+					async streamText(args) {
+						const result = await this.generateText(args);
+
+						return {
+							textStream: {
+								async *[Symbol.asyncIterator]() {
+									yield result.text;
+								},
+							},
+							text: Promise.resolve(result.text),
+						};
 					},
 				};
 			},

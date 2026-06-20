@@ -47,6 +47,8 @@ export const readInstalledSkillTool = createTool({
 			"Limitations or warnings:",
 			limitations,
 			match.skill.source ? `Source: ${match.skill.source}` : "",
-		].filter(Boolean).join("\n");
+		]
+			.filter(Boolean)
+			.join("\n");
 	},
 });

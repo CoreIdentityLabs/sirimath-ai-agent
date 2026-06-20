@@ -98,6 +98,24 @@ MODEL_ID=gpt-4o-mini
 OPENAI_API_KEY=sk-...
 ```
 
+For a local model with a small context window, set an explicit budget so Sirimath reserves output space and summarizes older turns before the prompt grows too large:
+
+```env
+MODEL_PROVIDER=lmstudio
+MODEL_ID=your-local-model
+LLM_CONTEXT_WINDOW=4096
+LLM_MAX_OUTPUT_TOKENS=512
+LLM_TOOL_OVERHEAD_TOKENS=1400
+```
+
+Optional tuning knobs:
+
+- `LLM_TOOL_OVERHEAD_TOKENS`: reserves context space for tool schemas and provider-side overhead.
+- `LLM_SUMMARIZATION_TRIGGER_TOKENS`: when conversation summarization starts.
+- `LLM_SUMMARIZATION_KEEP_MESSAGES`: how many recent messages stay verbatim after summarization.
+- `LLM_MEMORY_PROMPT_TOKENS`: cap for the extra long-term memory block injected ahead of the user message.
+- `LLM_MEMORY_MATCHED_LIMIT` / `LLM_MEMORY_RECENT_LIMIT`: how many memory items are retrieved for each turn.
+
 > **Azure note**: For Azure AI Foundry, `MODEL_ID` is your **deployment name** (not the model family name). The agent uses the Chat Completions API explicitly to ensure compatibility with reasoning models (`o1`, `o3`, `gpt-5.x`) in multi-turn conversations.
 
 > **LM Studio note**: `lmstudio` is a convenience preset built on the generic OpenAI-compatible provider. No API key is required. LM Studio must be running with its local server started (LM Studio → Local Server tab → Start Server). Override the default `http://localhost:1234/v1` endpoint via `LMSTUDIO_BASE_URL`.

@@ -1,5 +1,5 @@
 import { constants } from "node:fs";
-import { access, readdir, readFile } from "node:fs/promises";
+import { access, readFile, readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { z } from "zod";
 
@@ -72,9 +72,7 @@ function parseYamlFrontmatter(content: string): ParsedFrontmatter {
 	for (const line of match[1].split("\n")) {
 		const nameMatch = line.match(/^name:\s*["']?(.+?)["']?\s*$/i);
 		if (nameMatch) result.name = nameMatch[1].trim();
-		const descriptionMatch = line.match(
-			/^description:\s*["']?(.+?)["']?\s*$/i,
-		);
+		const descriptionMatch = line.match(/^description:\s*["']?(.+?)["']?\s*$/i);
 		if (descriptionMatch) result.description = descriptionMatch[1].trim();
 	}
 
@@ -97,7 +95,13 @@ function extractBulletItems(markdown: string, heading: string): string[] {
 		.split("\n")
 		.map((line) => line.trim())
 		.filter((line) => /^[*-]\s+/.test(line))
-		.map((line) => line.replace(/^[*-]\s+/, "").replace(/^✅\s*/, "").replace(/^❌\s*/, "").trim())
+		.map((line) =>
+			line
+				.replace(/^[*-]\s+/, "")
+				.replace(/^✅\s*/, "")
+				.replace(/^❌\s*/, "")
+				.trim(),
+		)
 		.filter(Boolean);
 }
 
@@ -176,7 +180,10 @@ async function readOptionalTextFile(filePath: string): Promise<string | null> {
 	}
 }
 
-async function readSkillMeta(filePath: string, warnings: string[]): Promise<SkillMeta> {
+async function readSkillMeta(
+	filePath: string,
+	warnings: string[],
+): Promise<SkillMeta> {
 	const raw = await readOptionalTextFile(filePath);
 	if (raw === null) return {};
 
@@ -208,7 +215,8 @@ async function readInstalledSkillDir(slug: string): Promise<InstalledSkill> {
 	const usageGuidance = deriveUsageGuidance(markdown ?? undefined);
 	const name = deriveDisplayName(slug, meta, frontmatter);
 	const description = deriveDescription(meta, frontmatter, summary);
-	const hasMeta = meta.name || meta.description || meta.source || meta.installedAt;
+	const hasMeta =
+		meta.name || meta.description || meta.source || meta.installedAt;
 
 	let status: InstalledSkill["status"] = "available";
 	if (markdown === null || (!summary && !usageGuidance)) {
@@ -219,7 +227,9 @@ async function readInstalledSkillDir(slug: string): Promise<InstalledSkill> {
 	}
 
 	if (!description) {
-		warnings.push("No concise description could be derived from the installed skill.");
+		warnings.push(
+			"No concise description could be derived from the installed skill.",
+		);
 	}
 
 	return InstalledSkillSchema.parse({
@@ -259,11 +269,14 @@ export async function loadInstalledSkillsCatalog(): Promise<InstalledSkillCatalo
 		const skillSlugs = entries
 			.filter((entry) => entry.isDirectory())
 			.map((entry) => entry.name);
-		const skills = await Promise.all(skillSlugs.map((slug) => readInstalledSkillDir(slug)));
+		const skills = await Promise.all(
+			skillSlugs.map((slug) => readInstalledSkillDir(slug)),
+		);
 
 		return InstalledSkillCatalogSchema.parse({
 			skills: skills.sort((left, right) => left.name.localeCompare(right.name)),
-			availableCount: skills.filter((skill) => skill.status !== "invalid").length,
+			availableCount: skills.filter((skill) => skill.status !== "invalid")
+				.length,
 			invalidCount: skills.filter((skill) => skill.status === "invalid").length,
 			scannedAt,
 			directoryStatus: "available",
@@ -284,8 +297,10 @@ export async function loadInstalledSkillsCatalog(): Promise<InstalledSkillCatalo
 
 export function formatInstalledSkillSummary(skill: InstalledSkill): string {
 	const summary = skill.summary || skill.description || "No summary available.";
-	const availability = skill.status === "available" ? "" : ` (${statusLabel(skill.status)})`;
-	const warning = skill.warnings.length > 0 ? ` Warning: ${skill.warnings[0]}` : "";
+	const availability =
+		skill.status === "available" ? "" : ` (${statusLabel(skill.status)})`;
+	const warning =
+		skill.warnings.length > 0 ? ` Warning: ${skill.warnings[0]}` : "";
 	return `- ${skill.name}${availability}: ${summary}${warning}`;
 }
 
@@ -337,7 +352,8 @@ export function lookupInstalledSkill(
 export function buildInstalledSkillDetailView(skill: InstalledSkill) {
 	return {
 		displayName: skill.name,
-		purpose: skill.summary || skill.description || "No purpose summary is available.",
+		purpose:
+			skill.summary || skill.description || "No purpose summary is available.",
 		recommendedUseCases: skill.usageGuidance
 			? skill.usageGuidance
 					.replace(/^Use when:\s*/i, "")

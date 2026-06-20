@@ -1,5 +1,6 @@
 import { createTool } from "@voltagent/core";
 import { z } from "zod";
+import { clampResults, clampSnippet, clampText } from "./shared/tool-output.js";
 
 interface BraveWebResult {
 	title: string;
@@ -52,7 +53,7 @@ async function braveSearch(
 	return (data.web?.results ?? []).map((result) => ({
 		title: result.title,
 		url: result.url,
-		snippet: result.description ?? "",
+		snippet: clampSnippet(result.description ?? "", 180),
 	}));
 }
 
@@ -81,7 +82,7 @@ async function tavilySearch(
 		results: (data.results ?? []).map((result) => ({
 			title: result.title,
 			url: result.url,
-			snippet: result.content.slice(0, 300),
+			snippet: clampSnippet(result.content, 180),
 			score: result.score,
 		})),
 	};
@@ -111,27 +112,30 @@ export const webSearchTool = createTool({
 		const searchUrl = buildGoogleSearchUrl(query);
 
 		if (hasBrave) {
-			const results = await braveSearch(query, count);
+			const results = clampResults(await braveSearch(query, count), 5);
 			return {
 				provider: "brave",
 				query,
 				searchUrl,
-				resultsSummary: formatResults(results),
+				resultsSummary: clampText(formatResults(results), 1_200),
 				links: results.map((result) => result.url),
 				results: results.map((result, index) => ({
 					rank: index + 1,
-					...result,
+					title: result.title,
+					url: result.url,
+					snippet: result.snippet,
 				})),
 				nextAction:
-					"Use fetchUrl on the 5 to 10 most relevant links from the links array to extract deeper details.",
+					"Use fetchUrl only on the 1 to 3 most relevant links from the links array to extract deeper details.",
 			};
 		}
 
 		if (hasTavily) {
 			const { answer, results } = await tavilySearch(query, count);
+			const limitedResults = clampResults(results, 5);
 			const resultsSummary = [
-				answer ? `**Summary**: ${answer}` : "",
-				formatResults(results),
+				answer ? `**Summary**: ${clampText(answer, 300)}` : "",
+				formatResults(limitedResults),
 			]
 				.filter(Boolean)
 				.join("\n\n");
@@ -140,14 +144,17 @@ export const webSearchTool = createTool({
 				provider: "tavily",
 				query,
 				searchUrl,
-				resultsSummary,
-				links: results.map((result) => result.url),
-				results: results.map((result, index) => ({
+				resultsSummary: clampText(resultsSummary, 1_200),
+				links: limitedResults.map((result) => result.url),
+				results: limitedResults.map((result, index) => ({
 					rank: index + 1,
-					...result,
+					title: result.title,
+					url: result.url,
+					snippet: result.snippet,
+					score: result.score,
 				})),
 				nextAction:
-					"Use fetchUrl on the 5 to 10 most relevant links from the links array to extract deeper details.",
+					"Use fetchUrl only on the 1 to 3 most relevant links from the links array to extract deeper details.",
 			};
 		}
 

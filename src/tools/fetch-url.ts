@@ -1,7 +1,8 @@
 import { createTool } from "@voltagent/core";
 import { z } from "zod";
+import { clampText } from "./shared/tool-output.js";
 
-const MAX_RESPONSE_CHARS = 12_000;
+const MAX_RESPONSE_CHARS = 2_500;
 
 export const fetchUrlTool = createTool({
 	name: "fetchUrl",
@@ -23,15 +24,14 @@ export const fetchUrlTool = createTool({
 
 		const contentType = response.headers.get("content-type") ?? "";
 		const raw = await response.text();
-		const body =
-			raw.length > MAX_RESPONSE_CHARS
-				? `${raw.slice(0, MAX_RESPONSE_CHARS)}…[truncated]`
-				: raw;
+		const body = clampText(raw, MAX_RESPONSE_CHARS);
 
 		return {
 			status: response.status,
 			contentType,
 			body,
+			bodyPreviewChars: body.length,
+			truncated: raw.length > body.length,
 			ok: response.ok,
 		};
 	},

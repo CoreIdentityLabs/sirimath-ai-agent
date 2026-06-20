@@ -1,3 +1,4 @@
+import type { Tool } from "@voltagent/core";
 import type { MemorySubsystem } from "../memory/index.js";
 import type { HeartbeatConfigStore } from "../reminders/heartbeat-config-store.js";
 import type { ReminderStore } from "../reminders/store.js";
@@ -13,10 +14,13 @@ import {
 	installSkillTool,
 	listInstalledSkillsTool,
 	readInstalledSkillTool,
+	readToolArtifactTool,
+	searchToolArtifactTool,
 	weatherTool,
 	webSearchEnabled,
 	webSearchTool,
 } from "../tools/index.js";
+import { wrapToolsWithArtifactSupport } from "../tools/tool-artifact-wrapper.js";
 
 export type SharedAgentDeps = {
 	memoryTools: MemorySubsystem["tools"];
@@ -36,13 +40,16 @@ export function buildSirimathTools({
 	heartbeatCfgStore,
 	resolveReminderContext,
 }: SharedAgentDeps) {
-	return [
+	// biome-ignore lint/suspicious/noExplicitAny: tool generics are invariant across schemas
+	const tools: Tool<any, any>[] = [
 		weatherTool,
 		fetchUrlTool,
 		duckDuckGoWebSearchTool,
 		...(webSearchEnabled ? [webSearchTool] : []),
 		listInstalledSkillsTool,
 		readInstalledSkillTool,
+		readToolArtifactTool,
+		searchToolArtifactTool,
 		findSkillsTool,
 		installSkillTool,
 		...memoryTools,
@@ -52,4 +59,6 @@ export function buildSirimathTools({
 		createListRemindersTool(reminderStore),
 		createConfigureHeartbeatTool(heartbeatCfgStore),
 	];
+
+	return wrapToolsWithArtifactSupport(tools);
 }

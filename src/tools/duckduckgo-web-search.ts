@@ -1,5 +1,6 @@
 import { createTool } from "@voltagent/core";
 import { z } from "zod";
+import { clampResults, clampSnippet, clampText } from "./shared/tool-output.js";
 
 interface DuckDuckGoSearchResultItem {
 	rank: number;
@@ -45,7 +46,7 @@ function extractDuckDuckGoResults(
 			rank: results.length + 1,
 			title,
 			url,
-			snippet,
+			snippet: clampSnippet(snippet, 180),
 		});
 
 		if (results.length >= count) break;
@@ -106,7 +107,7 @@ export const duckDuckGoWebSearchTool = createTool({
 		}
 
 		const html = await response.text();
-		const results = extractDuckDuckGoResults(html, count);
+		const results = clampResults(extractDuckDuckGoResults(html, count), 5);
 
 		if (results.length === 0) {
 			return {
@@ -126,11 +127,16 @@ export const duckDuckGoWebSearchTool = createTool({
 			provider: "duckduckgo",
 			query,
 			searchUrl,
-			resultsSummary: formatResults(results),
+			resultsSummary: clampText(formatResults(results), 1_200),
 			links: results.map((result) => result.url),
-			results,
+			results: results.map((result) => ({
+				rank: result.rank,
+				title: result.title,
+				url: result.url,
+				snippet: result.snippet,
+			})),
 			nextAction:
-				"Use fetchUrl on the 5 to 10 most relevant links from the links array to extract deeper details.",
+				"Use fetchUrl only on the 1 to 3 most relevant links from the links array to extract deeper details.",
 		};
 	},
 });

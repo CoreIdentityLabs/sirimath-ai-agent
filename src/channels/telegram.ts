@@ -15,6 +15,9 @@ export async function startTelegramBot(
 	channelRegistry: ChannelRegistry,
 	voiceProvider?: Voice | null,
 ): Promise<void> {
+	const STREAMING_EDIT_INTERVAL_MS = 750;
+	const STREAMING_EDIT_MAX_CHARS = 3500;
+
 	const token = process.env.TELEGRAM_BOT_TOKEN;
 	if (!token) {
 		logger.error(
@@ -38,6 +41,119 @@ export async function startTelegramBot(
 
 	const bot = new Bot(token);
 	channelRegistry.register(new TelegramChannelAdapter(bot));
+
+	function isMessageNotModifiedError(error: unknown): boolean {
+		if (!error || typeof error !== "object") return false;
+
+		const description =
+			"description" in error && typeof error.description === "string"
+				? error.description
+				: "message" in error && typeof error.message === "string"
+					? error.message
+					: "";
+
+		return description.toLowerCase().includes("message is not modified");
+	}
+
+	async function streamTelegramReply(
+		ctx: Context,
+		input: string,
+		userId: string,
+		conversationId: string,
+	): Promise<void> {
+		const chatId = ctx.chat?.id;
+		if (!chatId) {
+			throw new Error("Missing Telegram chat ID for streaming reply");
+		}
+
+		const stream = await agent.streamText({
+			input,
+			channel: "telegram",
+			channelUserId: userId,
+			conversationId,
+		});
+
+		let fullText = "";
+		let lastRendered = "";
+		let lastEditAt = 0;
+		const streamMessage: Awaited<ReturnType<Context["reply"]>> | null =
+			await ctx.reply("...");
+		let streamingDisabled = false;
+
+		for await (const chunk of stream.textStream) {
+			fullText += chunk;
+			const now = Date.now();
+			const shouldRender =
+				now - lastEditAt >= STREAMING_EDIT_INTERVAL_MS ||
+				fullText.length - lastRendered.length >= 120;
+
+			if (!shouldRender || streamingDisabled) {
+				continue;
+			}
+
+			if (fullText.length > STREAMING_EDIT_MAX_CHARS) {
+				streamingDisabled = true;
+				continue;
+			}
+
+			try {
+				if (streamMessage) {
+					await ctx.api.editMessageText(
+						chatId,
+						streamMessage.message_id,
+						fullText || "...",
+					);
+				}
+				lastRendered = fullText;
+				lastEditAt = now;
+			} catch (err) {
+				logger.debug("[telegram] Streaming edit skipped", {
+					err,
+					userId,
+				});
+				streamingDisabled = true;
+			}
+		}
+
+		const finalText = await stream.text;
+		if (streamMessage && finalText.length > 0 && finalText.length <= 4096) {
+			try {
+				await ctx.api.editMessageText(
+					chatId,
+					streamMessage.message_id,
+					finalText,
+				);
+				return;
+			} catch (err) {
+				if (isMessageNotModifiedError(err)) {
+					return;
+				}
+				logger.debug("[telegram] Final streaming edit failed", { err, userId });
+			}
+		}
+
+		const chunks = splitTelegramMessage(finalText, 4096);
+		let startIndex = 0;
+		if (streamMessage && chunks.length > 0) {
+			try {
+				await ctx.api.editMessageText(
+					chatId,
+					streamMessage.message_id,
+					chunks[0],
+				);
+				startIndex = 1;
+			} catch (err) {
+				if (isMessageNotModifiedError(err)) {
+					startIndex = 1;
+				}
+				// Fall through to send fresh messages.
+			}
+		}
+
+		for (const chunk of chunks.slice(startIndex)) {
+			await ctx.reply(chunk);
+		}
+	}
 
 	// Shared voice processing pipeline: download → STT → agent → TTS reply + text
 	async function processVoiceMessage(
@@ -255,17 +371,7 @@ export async function startTelegramBot(
 		});
 
 		try {
-			const result = await agent.generateText({
-				input: text,
-				channel: "telegram",
-				channelUserId: userId,
-				conversationId,
-			});
-
-			const chunks = splitTelegramMessage(result.text, 4096);
-			for (const chunk of chunks) {
-				await ctx.reply(chunk);
-			}
+			await streamTelegramReply(ctx, text, userId, conversationId);
 		} catch (err) {
 			logger.error("[telegram] Error generating response", {
 				err,

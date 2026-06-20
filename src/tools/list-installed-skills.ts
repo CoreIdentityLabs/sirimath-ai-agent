@@ -27,8 +27,10 @@ export const listInstalledSkillsTool = createTool({
 		const lines = includeWarnings
 			? catalog.skills.map((skill) => formatInstalledSkillSummary(skill))
 			: catalog.skills.map((skill) => {
-					const summary = skill.summary || skill.description || "No summary available.";
-					const availability = skill.status === "available" ? "" : ` (${skill.status})`;
+					const summary =
+						skill.summary || skill.description || "No summary available.";
+					const availability =
+						skill.status === "available" ? "" : ` (${skill.status})`;
 					return `- ${skill.name}${availability}: ${summary}`;
 				});
 
