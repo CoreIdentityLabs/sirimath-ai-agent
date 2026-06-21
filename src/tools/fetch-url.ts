@@ -11,7 +11,7 @@ export const fetchUrlTool = createTool({
 	parameters: z.object({
 		url: z.string().url().describe("The URL to fetch"),
 		headers: z
-			.record(z.string())
+			.record(z.string(), z.string())
 			.optional()
 			.describe("Optional HTTP headers (e.g. Accept, Authorization)"),
 	}),
